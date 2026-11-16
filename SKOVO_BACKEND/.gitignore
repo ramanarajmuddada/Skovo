@@ -1,0 +1,41 @@
+# Environment — never commit real credentials
+.env
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Flask session storage
+flask_session/
+
+# Runtime dirs created by the app
+logs/
+uploads/
+
+# Build / packaging
+*.egg-info/
+dist/
+build/
+instance/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# PDFs and design assets (not needed in repo)
+*.pdf
+
+# Dev-only utility scripts
+check_db.py
+fix_db.py
+test_email.py
+

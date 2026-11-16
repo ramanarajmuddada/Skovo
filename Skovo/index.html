@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/jpeg" href="/skovo-logo-blue.jpg" />
+    <link rel="apple-touch-icon" href="/skovo-logo-blue.jpg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SKOVO — Cohorts, Colleges and Career Readiness for Indian Students</title>
+    <!-- Apply dark before React boots so the first paint is not a white flash.
+         A saved light preference still wins; first visit opens dark. -->
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('sk-mode');
+          if (m !== 'light') document.documentElement.classList.add('dark');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+
+    <!-- UI02-175. There was no description at all, so every link anyone shared —
+         WhatsApp, LinkedIn, a Google result — showed the URL and nothing else.
+         The share card is often the first thing a student sees of the product. -->
+    <meta name="description"
+          content="SKOVO helps Indian students find the right college, join live cohorts
+                   with verified achievers, build a readiness score and reach real
+                   opportunities." />
+
+    <!-- Open Graph and Twitter carry the same copy: a share preview that differs
+         from the page it links to reads as a broken link. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SKOVO" />
+    <meta property="og:title" content="SKOVO — Cohorts, Colleges and Career Readiness" />
+    <meta property="og:description"
+          content="Find the right college, join live cohorts with verified achievers,
+                   and build a readiness score that unlocks real opportunities." />
+    <meta property="og:image" content="/skovo-logo-blue.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SKOVO — Cohorts, Colleges and Career Readiness" />
+    <meta name="twitter:description"
+          content="Find the right college, join live cohorts with verified achievers,
+                   and build a readiness score that unlocks real opportunities." />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

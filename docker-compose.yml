@@ -1,0 +1,155 @@
+# ═══════════════════════════════════════════════════════════════════
+# SKOVO — Local Development Docker Compose
+# Usage: make dev  OR  docker compose up
+#
+# Services: MySQL 8 · Redis 7 · Flask (hot-reload) · Vite (hot-reload)
+# ═══════════════════════════════════════════════════════════════════
+
+name: skovo-dev
+
+networks:
+  skovo_net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  uploads_data:
+  flask_session_data:
+
+services:
+
+  # ── MySQL 8 ───────────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: skovo_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE:-skovo}
+      MYSQL_USER:          ${MYSQL_USER:-skovo}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD:-skovo_password}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - skovo_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
+             "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: skovo_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - skovo_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Flask Backend (hot-reload via Flask dev server) ───────────────────────────
+  backend:
+    build:
+      context: ./SKOVO_BACKEND
+      target: development
+    container_name: skovo_backend
+    restart: unless-stopped
+    env_file:
+      - ./SKOVO_BACKEND/.env          # your existing dev secrets file
+    environment:
+      # These override .env values to point at Docker container hostnames
+      FLASK_ENV:       development
+      FLASK_DEBUG:     "1"
+      FLASK_APP:       app.py
+      Backend:         DEV
+      # Credential comes from the (gitignored) root .env — never hardcode it here.
+      # Put BACKEND_DATABASE_URL=... in ./.env next to this file.
+      DATABASE_URL:    ${BACKEND_DATABASE_URL:-mysql+pymysql://root@host.docker.internal:3306/SKOVO}
+      REDIS_URL:       redis://redis:6379/0
+      CACHE_TYPE:      RedisCache
+      CACHE_REDIS_URL: redis://redis:6379/0
+      SESSION_TYPE:    redis
+      SESSION_REDIS:   redis://redis:6379/1
+      # Web workers must NOT run the scheduler — the dedicated `scheduler`
+      # service below owns it (otherwise every gunicorn worker fires jobs).
+      ENABLE_SCHEDULER: "0"
+    command: >
+      sh -c "
+        echo '[wait] Waiting for MySQL to be fully ready...' &&
+        until nc -z host.docker.internal 3306 2>/dev/null; do sleep 2; done &&
+        echo '[wait] Port open, waiting for DB init...' &&
+        sleep 3 &&
+        echo '[start] Starting Flask...' &&
+        flask run --host=0.0.0.0 --port=5000 --reload
+      "
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./SKOVO_BACKEND:/app
+      - uploads_data:/app/portal/uploads
+      - flask_session_data:/app/flask_session
+    networks:
+      - skovo_net
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Scheduler (APScheduler session lifecycle + reminders) ─────────────────────
+  # ONE replica only. The web `backend` service runs ENABLE_SCHEDULER=0 so jobs
+  # fire exactly once here, not once per gunicorn worker. In ECS/prod, deploy this
+  # as its own single-task service the same way.
+  scheduler:
+    build:
+      context: ./SKOVO_BACKEND
+      target: development
+    container_name: skovo_scheduler
+    restart: unless-stopped
+    env_file:
+      - ./SKOVO_BACKEND/.env
+    environment:
+      FLASK_APP:        app.py
+      FLASK_ENV:        production        # no reloader; ensures the scheduler starts
+      FLASK_DEBUG:      "0"
+      ENABLE_SCHEDULER: "1"
+      DATABASE_URL:     ${BACKEND_DATABASE_URL:-mysql+pymysql://root@host.docker.internal:3306/SKOVO}
+      REDIS_URL:        redis://redis:6379/0
+    command: python run_scheduler.py
+    volumes:
+      - ./SKOVO_BACKEND:/app
+      - uploads_data:/app/portal/uploads
+    networks:
+      - skovo_net
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── React Frontend (Vite dev server with hot-reload) ─────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: skovo_frontend
+    working_dir: /app
+    command: sh -c "[ ! -d node_modules/.bin ] && npm install --legacy-peer-deps; npm run dev"
+    environment:
+      BACKEND_URL: http://backend:5000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./Skovo:/app
+      - /app/node_modules              # anonymous volume prevents host override
+    networks:
+      - skovo_net
+    depends_on:
+      - backend

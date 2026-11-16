@@ -1,0 +1,348 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SKOVO — Production / UAT stack (single EC2 host)
+#
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d
+#
+# MySQL is NOT here — it lives in RDS. Everything below runs on one EC2 box.
+#
+#   caddy      : TLS termination + reverse proxy (auto-renews certs)
+#   backend    : Flask/gunicorn, N workers, scheduler DISABLED
+#   scheduler  : APScheduler, exactly one replica, scheduler ENABLED
+#   migrate    : one-shot Alembic runner (profile: tools) — CI calls this
+#   redis      : cache + Socket.IO message queue + rate limiting
+#   prometheus : scrapes backend metrics
+#   loki       : log aggregation
+#   promtail   : ships container logs into Loki
+#   grafana    : dashboards over Prometheus + Loki
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: skovo-prod
+
+networks:
+  skovo_net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
+# ── Shared backend configuration ──────────────────────────────────────────────
+# Both `backend` and `scheduler` run the same image with the same secrets; they
+# differ only in ENABLE_SCHEDULER and the command. Anything changed here applies
+# to both, which is what keeps them from drifting apart.
+x-backend-common: &backend-common
+  # Single-instance deploys build the image on the host — there is no registry
+  # in the path. CI sets ECR_IMAGE to pull a published tag instead; with both
+  # keys present, `compose build` produces this tag and `up` uses it as-is.
+  image: ${ECR_IMAGE:-skovo-backend:local}
+  build:
+    context: ../SKOVO_BACKEND
+    target: production
+  restart: unless-stopped
+  networks: [skovo_net]
+  depends_on:
+    redis:
+      condition: service_healthy
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-backend-env: &backend-env
+  # DEV returns the OTP in the API response (dev_otp) so the team can sign in
+  # while Amazon SES is still restricted and can deliver mail to nobody. That is
+  # an account-takeover hole on a public host - anyone can submit an address and
+  # read the code back - so it is opt-in per environment through BACKEND_MODE in
+  # .env.prod, and defaults to PROD here. Set it back the moment SES production
+  # access is granted.
+  Backend: ${BACKEND_MODE:-PROD}
+  FLASK_APP: app.py
+  FLASK_ENV: production
+  FLASK_DEBUG: "0"
+
+  # ── Database (RDS) ──────────────────────────────────────────────────────────
+  # MUST be mysql+pymysql:// — the stored-procedure layer is MySQL-specific and
+  # a Postgres URL connects fine, then fails on the first CALL.
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL not set}
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  REDIS_URL: redis://redis:6379/0
+  CACHE_TYPE: RedisCache
+  CACHE_REDIS_URL: redis://redis:6379/0
+  SESSION_TYPE: redis
+  SESSION_REDIS: redis://redis:6379/1
+
+  # ── Secrets ─────────────────────────────────────────────────────────────────
+  APP_SECRET_KEY: ${APP_SECRET_KEY:?}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
+
+  # ── S3 uploads (portal/helpers/storage.py) ──────────────────────────────────
+  S3_BUCKET: ${S3_BUCKET:?}
+  AWS_REGION: ${AWS_REGION:-ap-south-1}
+  S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL}
+
+  # ── CORS ────────────────────────────────────────────────────────────────────
+  CORS_ORIGINS: ${CORS_ORIGINS:?e.g. https://skovoai.com,https://skovoai.info}
+
+  # ── Payments / SMS / mail ───────────────────────────────────────────────────
+  # Cashfree replaced Razorpay; none of its variables were ever passed through,
+  # so the deployed backend had no gateway credentials and every checkout failed
+  # with "Payment gateway is not configured" regardless of what .env.prod held.
+  # CASHFREE_ENV picks both the endpoint and which key pair below is read.
+  CASHFREE_ENV: ${CASHFREE_ENV:-production}
+  CASHFREE_APP_ID_PRODUCTION: ${CASHFREE_APP_ID_PRODUCTION}
+  CASHFREE_SECRET_KEY_PRODUCTION: ${CASHFREE_SECRET_KEY_PRODUCTION}
+  CASHFREE_APP_ID_SANDBOX: ${CASHFREE_APP_ID_SANDBOX}
+  CASHFREE_SECRET_KEY_SANDBOX: ${CASHFREE_SECRET_KEY_SANDBOX}
+  CASHFREE_WEBHOOK_SECRET: ${CASHFREE_WEBHOOK_SECRET}
+
+  # Cashfree rejects an order outright unless return_url is https, and the
+  # webhook has to reach this host by name, so both must be absolute.
+  FRONTEND_URL: ${FRONTEND_URL:-https://skovoai.com}
+  API_URL: ${API_URL:-https://api.skovoai.com}
+
+  # The SPA is served from S3 and the API from here, so a root-relative
+  # /uploads/<name> would resolve against the S3 origin and 404. Absolute only.
+  PUBLIC_MEDIA_BASE_URL: ${PUBLIC_MEDIA_BASE_URL:-https://api.skovoai.com}
+
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+  RAZORPAY_SECRET: ${RAZORPAY_SECRET}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+  MSG91_AUTH_KEY: ${MSG91_AUTH_KEY}
+  MSG91_SENDER_ID: ${MSG91_SENDER_ID:-SKOVO}
+  MSG91_OTP_TEMPLATE_ID: ${MSG91_OTP_TEMPLATE_ID}
+  FAST2SMS_API_KEY: ${FAST2SMS_API_KEY}
+  MAILSERVER_DOMAIN: ${MAILSERVER_DOMAIN:-smtp.gmail.com}
+  MAILSERVER_PORT: ${MAILSERVER_PORT:-587}
+  MAILSERVER_USERNAME: ${MAILSERVER_USERNAME}
+  MAILSERVER_PASSWORD: ${MAILSERVER_PASSWORD}
+  MAIL_SENDER_NAME: ${MAIL_SENDER_NAME:-SKOVO Team}
+
+  # ── The 18 that the container could not see ─────────────────────────────────
+  # Every one of these is documented in .env.prod.example and read by the code
+  # via os.environ.get(), but none were listed here - so compose never passed
+  # them in and the app read None no matter what .env.prod said. That is how a
+  # signup on the live site answered "Failed to send OTP" with SENDGRID_API_KEY
+  # apparently configured: the container had never heard of it.
+  #
+  # None of them crash when absent. They degrade in silence, which is worse.
+
+  # Mail delivery. Without the key there is no signup OTP, no password reset and
+  # no booking notification - MAILSERVER_* above is only the SMTP fallback.
+  SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+  MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL}
+
+  # Every link inside an outgoing email is built from this.
+  FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+
+  # The BGV vendor signs its callback with this. Unset, the endpoint rejects
+  # every callback by design, so no achiever reaches tier L3 and none can teach
+  # a 14-17 year old student.
+  BGV_WEBHOOK_SECRET: ${BGV_WEBHOOK_SECRET}
+
+  # Video sessions. Unset, no room is auto-created and a booked 1-on-1 shows
+  # a Join link only once the achiever supplies one.
+  DAILY_API_KEY: ${DAILY_API_KEY}
+  DAILY_SUBDOMAIN: ${DAILY_SUBDOMAIN}
+  DAILY_PRIVATE: ${DAILY_PRIVATE:-1}
+  DAILY_ENABLE_RECORDING: ${DAILY_ENABLE_RECORDING:-0}
+
+  # Notification path (the OTP path uses MSG91_AUTH_KEY above). Off by default.
+  NOTIFY_SMS_ENABLED: ${NOTIFY_SMS_ENABLED:-0}
+  NOTIFY_WHATSAPP_ENABLED: ${NOTIFY_WHATSAPP_ENABLED:-0}
+  MSG91_SMS_SENDER: ${MSG91_SMS_SENDER:-SKOVO}
+  MSG91_WA_NUMBER: ${MSG91_WA_NUMBER}
+  MSG91_WA_NAMESPACE: ${MSG91_WA_NAMESPACE}
+  WHATSAPP_NOTIFY_TEMPLATE: ${WHATSAPP_NOTIFY_TEMPLATE}
+
+  # CRM lead sync.
+  ZOHO_WEBHOOK_URL: ${ZOHO_WEBHOOK_URL}
+
+  # Razorpay Route splits an achiever's share at capture time. Leave 0 until the
+  # linked accounts exist, or captures fail.
+  RAZORPAY_ROUTE_ENABLED: ${RAZORPAY_ROUTE_ENABLED:-0}
+
+  # Cache / rate limiting.
+  CACHE_DEFAULT_TIMEOUT: ${CACHE_DEFAULT_TIMEOUT:-300}
+  RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/2}
+
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+
+  # ── Caddy — TLS + reverse proxy ─────────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: skovo_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?e.g. api.skovoai.com}
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:?e.g. metrics.skovoai.com}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [skovo_net]
+    depends_on: [backend, grafana]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+  # The React bundle is not served from this host. CloudFront serves it from
+  # the skovo-web S3 bucket for all three hostnames, and the frontend deploy is
+  # a build + `aws s3 sync` from a laptop. The nginx container that used to live
+  # here held a second copy of the same files: a second thing to remember to
+  # update, which is exactly how the two copies ended up on different builds.
+
+  # ── Flask web workers ───────────────────────────────────────────────────────
+  backend:
+    <<: *backend-common
+    container_name: skovo_backend
+    environment:
+      <<: *backend-env
+
+      # The scheduler runs in its own service below. If this were 1, every
+      # gunicorn worker would start its own APScheduler and fire each reminder
+      # N times.
+      ENABLE_SCHEDULER: "0"
+
+      # Migrations are a pre-deploy CI step (see the `migrate` service and
+      # .github/workflows/deploy.yml). Instances must never race the Alembic lock.
+      RUN_MIGRATIONS: "0"
+
+      # eventlet, NOT the entrypoint's `sync` default — Socket.IO powers the
+      # whiteboard and chat, and sync workers cannot hold websockets open.
+      GUNICORN_WORKER_CLASS: eventlet
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_TIMEOUT: "120"
+      PORT: "5000"
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:5000/v1/health', timeout=5).status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── APScheduler — exactly one replica, never scale this ─────────────────────
+  scheduler:
+    <<: *backend-common
+    container_name: skovo_scheduler
+    environment:
+      <<: *backend-env
+      ENABLE_SCHEDULER: "1"
+      RUN_MIGRATIONS: "0"
+    command: python run_scheduler.py
+
+  # ── One-shot migration runner (CI invokes this before swapping backend) ─────
+  migrate:
+    <<: *backend-common
+    container_name: skovo_migrate
+    restart: "no"
+    profiles: [tools]
+    environment:
+      <<: *backend-env
+      ENABLE_SCHEDULER: "0"
+    # Alembic owns 19 revisions. It does not own the 53 hand-written migrations
+    # in database/migrations/ or the 709 stored procedures the SP-only backend
+    # calls on every request. Running only `flask db upgrade` here produced a
+    # schema with zero procedures - the app booted healthy and then failed every
+    # request with "PROCEDURE ... does not exist".
+    #
+    # entrypoint.sh does run apply_all.py, but only when RUN_MIGRATIONS=1, and
+    # the web services set it to 0 so they never race on the Alembic lock. That
+    # left no service running it at all. This one now does, and it is the only
+    # one that should.
+    #
+    # apply_all.py drives Alembic itself - stamp on a fresh database, upgrade on
+    # an existing one - so `flask db upgrade` must NOT run ahead of it. On a
+    # fresh database create_all() has already built today's schema and replaying
+    # the 19 revisions over it dies on "Duplicate column name 'password_hash'".
+    entrypoint: ["/bin/sh", "-c", "python3 apply_all.py ${APPLY_ALL_ARGS:-}"]
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: skovo_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory ${REDIS_MAXMEMORY:-512mb}
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks: [skovo_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: skovo_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks: [skovo_net]
+
+  # ── Loki ────────────────────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: skovo_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    networks: [skovo_net]
+
+  # ── Promtail — ships container logs to Loki ─────────────────────────────────
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: skovo_promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [skovo_net]
+    depends_on: [loki]
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: skovo_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set a real password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: https://${GRAFANA_DOMAIN}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    expose:
+      - "3000"
+    networks: [skovo_net]
+    depends_on: [prometheus, loki]

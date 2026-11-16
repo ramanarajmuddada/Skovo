@@ -1,0 +1,76 @@
+# Walks the v1 student screens on mobile via the tab bar and the More hub.
+# Run:  maestro test flows/02-navigate-v1-screens.yaml
+appId: ${APP_ID}
+env:
+  EMAIL: e2e.pro@skovo-test.local
+  PASSWORD: E2ePass!234
+---
+- launchApp:
+    clearState: true
+
+# Landing screen — tap through to the sign-in form. `optional` so a flow that
+# starts already past it (runFlow from another spec) does not fail here.
+- tapOn:
+    text: "Get started"
+    optional: true
+- runFlow: 01-login.yaml
+
+# ── bottom tabs ───────────────────────────────────────────────────────────
+- tapOn: "Cohorts"
+- assertVisible:
+    text: "Cohorts"
+    timeout: 10000
+
+- tapOn: "Mentors"
+- assertVisible:
+    text: ".*Achiever.*|.*Mentor.*"
+    timeout: 10000
+
+- tapOn: "Bookings"
+- assertVisible:
+    text: ".*Booking.*"
+    timeout: 10000
+
+# ── More hub → each v1 screen ─────────────────────────────────────────────
+- tapOn: "More"
+- assertVisible: "My Score"
+
+- tapOn: "My Score"
+- assertVisible:
+    text: "/ 100"
+    timeout: 10000
+- back
+
+- tapOn: "More"
+- tapOn: "Document Vault"
+- assertVisible:
+    text: ".*Document Vault.*"
+    timeout: 10000
+- back
+
+- tapOn: "More"
+- tapOn: "Market"
+- assertVisible:
+    text: ".*Market.*"
+    timeout: 10000
+- back
+
+- tapOn: "More"
+- tapOn: "Assemble"
+- assertVisible:
+    text: ".*Assemble.*|.*communit.*"
+    timeout: 10000
+- back
+
+- tapOn: "More"
+- tapOn: "Applications"
+- assertVisible:
+    text: ".*Application.*"
+    timeout: 10000
+- back
+
+- tapOn: "More"
+- tapOn: "Saved Colleges"
+- assertVisible:
+    text: ".*Saved Colleges.*"
+    timeout: 10000

@@ -1,0 +1,1376 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@import "../node_modules/shadcn/dist/tailwind.css";
+
+@import "@fontsource-variable/geist";
+
+/* ─── Dark mode: class-based ─────────────────────────────────── */
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+}
+
+/* ─── Accent + Sidebar Color Variables (default: blue) ────────── */
+:root {
+  --accent:       #2563eb;
+  --accent-hov:   #1d4ed8;
+  --accent-light: #eff6ff;
+  --accent-text:  #1e40af;
+  --accent-ring:  #93c5fd;
+  --accent-muted: #bfdbfe;
+
+  /* Sidebar / header background changes per theme */
+  --sidebar-bg:       #09152a;
+  --sidebar-sec:      #0d1e3e;
+  --sidebar-border:   rgba(37, 99, 235, 0.12);
+  --sidebar-hover:    rgba(37, 99, 235, 0.12);
+  --sidebar-glow:     rgba(37, 99, 235, 0.08);
+
+  /* App content background. The SuperLayout <main> has always asked for
+     `var(--bg)`, which was defined nowhere — so the declaration was dropped
+     and the Founder Console inherited a bare background while every other
+     portal painted an explicit slate-50. Defining it here fixes all 20 super
+     screens without touching the layout, and gives the other portals a token
+     to move onto later.
+
+     Its dark counterpart is deliberately declared just below this block rather
+     than with the other dark overrides — see the note there. */
+  --bg: #f8fafc;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* Dark value for `--bg`, and it has to live out here rather than with the other
+   dark overrides inside `@layer base`.
+
+   Cascade layers outrank specificity: an unlayered declaration beats a layered
+   one no matter how specific the layered selector is. `:root` above is
+   unlayered, so the dark override written inside the base layer lost to it
+   and the Founder Console rendered its content area in #f8fafc — a full-page
+   near-white slab — on all 10 Super screens in dark mode, which then dragged
+   every heading on those screens down with it (`text-slate-900` remaps to a
+   near-white in dark mode, so it measured 1.05:1 against that slab: invisible).
+
+   The neighbouring dark rules in that layer survive only because they carry
+   `!important`, which reverses layer order. This one is a custom property with
+   no competing utility to out-shout, so it needs to be unlayered instead. */
+/* color-scheme tells the BROWSER which palette to paint its own controls in.
+   Nothing in this file can reach them: the <input type="datetime-local">
+   calendar popup, the native <select> list, scrollbars, and the spin buttons
+   on a number input are all browser chrome, drawn outside the page. Without
+   this the date picker opened as a white calendar on a dark dialog.
+
+   It is declared on both sides on purpose. `color-scheme: dark` alone would
+   leave the light theme inheriting whatever the OS is set to, so a user on a
+   dark OS would get dark scrollbars on a white page. */
+html:not(.dark) { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+html.dark { --bg: #020617; }
+
+/* The accent tint and the text that sits on it had light values only, so in
+   dark mode every `--accent-light` tile (the Masters header icon, the selected
+   type, OTP digits) was a near-white slab on navy. Derive both from the live
+   accent so all eight themes get a matching dark pair without eight blocks.
+   `[class]` lifts this to (0,2,1), above the `html.th-*` theme blocks (0,1,1)
+   that set the light values. */
+html.dark[class] {
+  --accent-light: color-mix(in srgb, var(--accent) 22%, transparent);
+  --accent-text:  color-mix(in srgb, var(--accent) 40%, white);
+}
+
+/* Blue is the default accent, so its values live in `:root` above and every
+   other theme gets an `html.th-*` block. That asymmetry is a bug in dark mode.
+
+   `ThemeContext` always adds a `th-<accent>` class, including `th-blue` — but
+   no rule matched it, so blue fell through to `:root`. `:root` and `.dark` have
+   equal specificity (0,1,0), and the shadcn `.dark` block further down declares
+   its own `--accent: oklch(0.269 0 0)` — a dark neutral grey, meant as a "muted
+   hover" token, colliding by name with the brand accent. Later rule wins, so in
+   dark mode every primary button, focus ring and accent bar turned grey-olive:
+   the Sign In button on the login page was dark grey on near-black.
+
+   It only ever affected blue. `html.th-violet` and friends are (0,1,1), which
+   already outranks `.dark` — which is why switching accent appeared to "fix"
+   dark mode, and why this survived: nobody testing a colour theme would see it.
+
+   Giving blue the same block it should always have had restores the pattern and
+   the specificity. Values are copied verbatim from `:root`, so light mode is
+   byte-identical; only the dark-mode collision changes. */
+html.th-blue {
+  --accent:       #2563eb;
+  --accent-hov:   #1d4ed8;
+  --accent-light: #eff6ff;
+  --accent-text:  #1e40af;
+  --accent-ring:  #93c5fd;
+  --accent-muted: #bfdbfe;
+
+  --sidebar-bg:     #09152a;
+  --sidebar-sec:    #0d1e3e;
+  --sidebar-border: rgba(37, 99, 235, 0.12);
+  --sidebar-hover:  rgba(37, 99, 235, 0.12);
+  --sidebar-glow:   rgba(37, 99, 235, 0.08);
+}
+
+html.th-violet {
+  --accent:       #7c3aed;
+  --accent-hov:   #6d28d9;
+  --accent-light: #f5f3ff;
+  --accent-text:  #5b21b6;
+  --accent-ring:  #c4b5fd;
+  --accent-muted: #ddd6fe;
+
+  --sidebar-bg:     #0e0b22;
+  --sidebar-sec:    #160f30;
+  --sidebar-border: rgba(124, 58, 237, 0.15);
+  --sidebar-hover:  rgba(124, 58, 237, 0.12);
+  --sidebar-glow:   rgba(124, 58, 237, 0.08);
+}
+
+html.th-emerald {
+  --accent:       #059669;
+  --accent-hov:   #047857;
+  --accent-light: #ecfdf5;
+  --accent-text:  #065f46;
+  --accent-ring:  #6ee7b7;
+  --accent-muted: #a7f3d0;
+
+  --sidebar-bg:     #081a10;
+  --sidebar-sec:    #0c2518;
+  --sidebar-border: rgba(5, 150, 105, 0.15);
+  --sidebar-hover:  rgba(5, 150, 105, 0.12);
+  --sidebar-glow:   rgba(5, 150, 105, 0.08);
+}
+
+html.th-rose {
+  --accent:       #e11d48;
+  --accent-hov:   #be123c;
+  --accent-light: #fff1f2;
+  --accent-text:  #9f1239;
+  --accent-ring:  #fda4af;
+  --accent-muted: #fecdd3;
+
+  --sidebar-bg:     #1e0810;
+  --sidebar-sec:    #2a0c18;
+  --sidebar-border: rgba(225, 29, 72, 0.15);
+  --sidebar-hover:  rgba(225, 29, 72, 0.12);
+  --sidebar-glow:   rgba(225, 29, 72, 0.08);
+}
+
+html.th-orange {
+  --accent:       #ea580c;
+  --accent-hov:   #c2410c;
+  --accent-light: #fff7ed;
+  --accent-text:  #9a3412;
+  --accent-ring:  #fdba74;
+  --accent-muted: #fed7aa;
+
+  --sidebar-bg:     #1c1004;
+  --sidebar-sec:    #271508;
+  --sidebar-border: rgba(234, 88, 12, 0.15);
+  --sidebar-hover:  rgba(234, 88, 12, 0.12);
+  --sidebar-glow:   rgba(234, 88, 12, 0.08);
+}
+
+html.th-teal {
+  --accent:       #0d9488;
+  --accent-hov:   #0f766e;
+  --accent-light: #f0fdfa;
+  --accent-text:  #115e59;
+  --accent-ring:  #5eead4;
+  --accent-muted: #99f6e4;
+
+  --sidebar-bg:     #07181a;
+  --sidebar-sec:    #0a2222;
+  --sidebar-border: rgba(13, 148, 136, 0.15);
+  --sidebar-hover:  rgba(13, 148, 136, 0.12);
+  --sidebar-glow:   rgba(13, 148, 136, 0.08);
+}
+
+html.th-indigo {
+  --accent:       #4338ca;
+  --accent-hov:   #3730a3;
+  --accent-light: #eef2ff;
+  --accent-text:  #312e81;
+  --accent-ring:  #a5b4fc;
+  --accent-muted: #c7d2fe;
+
+  --sidebar-bg:     #0b0d26;
+  --sidebar-sec:    #111430;
+  --sidebar-border: rgba(67, 56, 202, 0.15);
+  --sidebar-hover:  rgba(67, 56, 202, 0.12);
+  --sidebar-glow:   rgba(67, 56, 202, 0.08);
+}
+
+html.th-pink {
+  --accent:       #db2777;
+  --accent-hov:   #be185d;
+  --accent-light: #fdf2f8;
+  --accent-text:  #9d174d;
+  --accent-ring:  #f9a8d4;
+  --accent-muted: #fbcfe8;
+
+  --sidebar-bg:     #1c0915;
+  --sidebar-sec:    #260d1e;
+  --sidebar-border: rgba(219, 39, 119, 0.15);
+  --sidebar-hover:  rgba(219, 39, 119, 0.12);
+  --sidebar-glow:   rgba(219, 39, 119, 0.08);
+}
+
+/* ─── Base styles ────────────────────────────────────────────── */
+@layer base {
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-color: #f8fafc;
+    color: #0f172a;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* ── Dark mode global overrides ──────────────────────────── */
+  html.dark body {
+    background-color: #020617;
+    color: #f1f5f9;
+  }
+  html.dark .bg-white          { background-color: #0f172a !important; }
+
+  /* `bg-white/95` is a DIFFERENT class token from `bg-white`, so the rule
+     above never matched it. The achiever Verification screen's sticky Submit
+     bar is `bg-white/95 backdrop-blur` and stayed a bright white slab in dark
+     mode, sitting on top of a near-black page. Same failure as the tinted
+     panels fixed earlier — an opacity modifier makes a new class name.
+
+     THRESHOLD, and it matters: only /50 and above are remapped. Below that,
+     `bg-white/10` and `bg-white/20` are not surfaces at all — they are a faint
+     white veil deliberately laid ON a dark or coloured ground (icon tiles in
+     gradient heroes, hover states on white-text buttons). Darkening those
+     would erase them. High opacity means "this is a card"; low opacity means
+     "this is a highlight on something else".
+
+     Kept slightly translucent so `backdrop-blur` still has something to do.
+     A new step (say /85) needs adding here — there is no range selector in
+     CSS, so the list is explicit on purpose. */
+  html.dark [class*="bg-white/50"],
+  html.dark [class*="bg-white/60"],
+  html.dark [class*="bg-white/70"],
+  html.dark [class*="bg-white/75"],
+  html.dark [class*="bg-white/80"],
+  html.dark [class*="bg-white/85"],
+  html.dark [class*="bg-white/90"],
+  html.dark [class*="bg-white/95"],
+  html.dark [class*="bg-white/97"],
+  html.dark [class*="bg-white/98"] { background-color: rgba(15, 23, 42, 0.95) !important; }
+  html.dark .bg-slate-50       { background-color: #020617 !important; }
+  /* ...and its opacity variants, which the line above does NOT match: the
+     modifier makes a different class token, exactly as for bg-white/N and
+     bg-emerald-50/N above. This is the third time this trap has bitten.
+
+     Written as exact escaped classes rather than [class*="bg-slate-50/"]
+     ON PURPOSE: that substring also appears inside `hover:bg-slate-50/70`, so
+     an attribute match would paint every hoverable table row permanently dark
+     instead of only on hover. The hover variants are handled separately, in
+     the "Hover states" block below.
+
+     Symptom this fixed: clicking an agreement on the achiever Verification
+     screen flashed white. While the request is in flight the row is
+     `bg-slate-50/60` (AchieverApplication.jsx:257, the `blocked` branch), and
+     with no dark rule it rendered light for the length of the round trip. */
+  html.dark .bg-slate-50\/50,
+  html.dark .bg-slate-50\/60,
+  html.dark .bg-slate-50\/70,
+  html.dark .bg-slate-50\/95  { background-color: #020617 !important; }
+
+  /* The landing page's off-white section background.
+     `bg-[#FAFAF8]` is an arbitrary value, so NONE of the rules above reach it
+     -- they match Tailwind's named shades. Four sections on the public page use
+     it, and dark mode lightened the text sitting on them (`text-slate-900` ->
+     #f1f5f9) while leaving the background at #FAFAF8. Measured on the rendered
+     page, the "You have 15 apps" heading came out at 1.03:1 -- white on white,
+     invisible rather than merely low contrast. This is the same trap as
+     bg-white/95 and bg-slate-50/N above, one step further out: an arbitrary
+     value is its own class token too.
+     Same target colour as .bg-slate-50, because it plays the same part -- the
+     quieter alternate to a white section. */
+  html.dark .bg-\[\#FAFAF8\]  { background-color: #020617 !important; }
+  html.dark .bg-slate-100      { background-color: #1e293b !important; }
+  html.dark .bg-slate-200      { background-color: #334155 !important; }
+  html.dark .border-slate-100  { border-color: #1e293b  !important; }
+  html.dark .border-slate-200  { border-color: #334155  !important; }
+  html.dark .border-slate-300  { border-color: #475569  !important; }
+  html.dark .text-slate-900    { color: #f1f5f9  !important; }
+  html.dark .text-slate-800    { color: #e2e8f0  !important; }
+  html.dark .text-slate-700    { color: #cbd5e1  !important; }
+  html.dark .text-slate-600    { color: #a3b0c2  !important; }
+  /* The ladder above mirrors the slate scale around 500 — 900↔100, 800↔200,
+     700↔300, 600↔400. That is right for headings and body, and wrong for the
+     bottom two steps, which is where it stopped being a mapping and became a
+     bug:
+
+       .text-slate-500 → #64748b   is slate-500 mapped to itself (a no-op)
+       .text-slate-400 → #475569   is slate-400 mapped *darker* than it started
+
+     Every other step in this block moves lighter. These two do not, so muted
+     text — field labels, helper copy, table sub-values, timestamps, "N of M"
+     counters — landed at 3.75:1 and 2.36:1 against the card surface. Both are
+     under the 4.5:1 AA floor, and 2.36 is roughly grey-on-black.
+
+     It is the widest-reaching dark-mode defect in the app: 1,728 uses of these
+     two classes across all four portals (Student 544, Admin 606, Achiever 250,
+     Super 163, shared components 155). It reads as "dark mode looks washed out"
+     rather than as a bug, which is why it was never filed.
+
+     Values below keep the hierarchy (400 stays quieter than 500, which stays
+     quieter than 600) while clearing AA on the worst dark surface the app
+     actually paints. That is *not* the card (#0f172a) but the input and chip
+     fill (#1e293b, what `.bg-slate-100` remaps to) — a first pass tuned to the
+     card left `.text-slate-400` at 4.21:1 there, which still failed on select
+     placeholders and table dates in the Admin and Super consoles:
+
+                   on #1e293b   on #0f172a   on #020617
+       slate-400     5.16         6.30         7.12
+       slate-500     6.06         7.39         8.35
+       slate-600     6.65         8.12         9.17
+
+     All three move together because lifting only 400 would have made it lighter
+     than 500 and inverted the hierarchy the ladder exists to express. 700 and
+     above are untouched and still sit above 600. */
+  html.dark .text-slate-500    { color: #9aa8bb  !important; }
+  html.dark .text-slate-400    { color: #8b9bb0  !important; }
+  /* `> *`, not `> * + *`: Tailwind v4 draws divide-y as a BOTTOM border on
+     every child but the last, so `* + *` missed the first row and left one
+     bright light-theme line under it. */
+  html.dark .divide-slate-100  > * { border-color: #1e293b !important; }
+  html.dark .divide-slate-50   > * { border-color: #1e293b !important; }
+  html.dark .divide-slate-200  > * { border-color: #334155 !important; }
+
+  /* ── Dark mode: semantic tints ────────────────────────────────
+     The slate remaps above cover surfaces. They do not cover the tinted
+     panels — status pills, notification chips, probation banners, Pro
+     upsells — which the app writes as bg-emerald-50 / text-red-600 /
+     border-amber-200 and friends. Those are near-white by design, so on a
+     #020617 page they rendered as glaring light blocks with dark text on
+     them: the single most visible way dark mode looked half-finished.
+
+     Tinting with color-mix rather than a fixed dark hex is what lets one
+     rule serve both surfaces — these pills sit on the page (#020617) and
+     inside cards and modals (#0f172a), and a hardcoded colour can only be
+     right on one of them. The same reason `.chip-active` below already
+     works this way.
+
+     Text moves to the 300-weight of its own family instead of the 600/700
+     the light theme uses: 600 on a dark tint fails contrast, and keeping
+     the hue is what preserves the meaning (red still reads as danger).
+
+     Covers the nine families the app actually uses. Adding a family here
+     is cheaper than adding `dark:` variants to every call site, and it
+     cannot drift, which is why it lives in one place.
+
+     The `[class*="bg-…-50/"]` selectors are not redundant. The Tailwind opacity
+     modifier produces a *different class token*: `bg-emerald-50/60` is its own
+     class, which `.bg-emerald-50` does not match. Without these, the 23 such
+     panels in 14 files kept their near-white background while the text rules
+     below still lightened their text — light-on-light, which is worse than the
+     untouched original. Found by measuring contrast on the rendered page:
+     The Market coupon strip scored 1.89:1. Substring matching is the only way to
+     reach a token whose own name carries the modifier. */
+  html.dark .bg-emerald-50,
+  html.dark [class*="bg-emerald-50/"],
+  html.dark [class*="bg-emerald-100/"],
+  html.dark .bg-emerald-100 { background-color: color-mix(in srgb, #10b981 15%, transparent) !important; }
+  html.dark .bg-amber-50,
+  html.dark [class*="bg-amber-50/"],
+  html.dark [class*="bg-amber-100/"],
+  /* Amber and orange are NOT tinted in dark mode: any warm hue mixed over the
+     navy background reads as muddy brown (the user's call, 18 Oct 2026). These
+     panels take the raised-card surface instead; their amber text and border
+     still mark them as a warning. */
+  html.dark .bg-amber-100   { background-color: #1e293b !important; }
+  html.dark .bg-red-50,
+  html.dark [class*="bg-red-50/"],
+  html.dark [class*="bg-red-100/"],
+  html.dark .bg-red-100     { background-color: color-mix(in srgb, #ef4444 15%, transparent) !important; }
+  html.dark .bg-purple-50,
+  html.dark [class*="bg-purple-50/"],
+  html.dark [class*="bg-purple-100/"],
+  html.dark .bg-purple-100  { background-color: color-mix(in srgb, #a855f7 15%, transparent) !important; }
+  html.dark .bg-violet-50,
+  html.dark [class*="bg-violet-50/"],
+  html.dark [class*="bg-violet-100/"],
+  html.dark .bg-violet-100  { background-color: color-mix(in srgb, #8b5cf6 15%, transparent) !important; }
+  html.dark .bg-blue-50,
+  html.dark [class*="bg-blue-50/"],
+  html.dark [class*="bg-blue-100/"],
+  html.dark .bg-blue-100    { background-color: color-mix(in srgb, #3b82f6 15%, transparent) !important; }
+  html.dark .bg-indigo-50,
+  html.dark [class*="bg-indigo-50/"],
+  html.dark [class*="bg-indigo-100/"],
+  html.dark .bg-indigo-100  { background-color: color-mix(in srgb, #6366f1 15%, transparent) !important; }
+  html.dark .bg-green-50,
+  html.dark [class*="bg-green-50/"],
+  html.dark [class*="bg-green-100/"],
+  html.dark .bg-green-100   { background-color: color-mix(in srgb, #22c55e 15%, transparent) !important; }
+  html.dark .bg-orange-50,
+  html.dark [class*="bg-orange-50/"],
+  html.dark [class*="bg-orange-100/"],
+  html.dark .bg-orange-100  { background-color: #1e293b !important; }
+
+  /* 500 through 900. The 900 step is not decorative: it is what the app reaches
+     for on the *heading* inside a tinted panel — "Your discount codes",
+     "Probation", "Payment failed" — 44 uses across eight families. Leaving it
+     out meant the panel darkened around a heading that stayed near-black, so
+     the most important line in the block was the least readable one (the Market
+     coupon heading measured 3.34:1).
+
+     Note the previous ladder also listed 900 for orange but not 800, while
+     every other family did the reverse. Normalising all nine to 500–900 removes
+     the asymmetry rather than adding a tenth special case. */
+  html.dark .text-emerald-500, html.dark .text-emerald-600, html.dark .text-emerald-700,
+  html.dark .text-emerald-800, html.dark .text-emerald-900 { color: #6ee7b7 !important; }
+  html.dark .text-amber-500,   html.dark .text-amber-600,   html.dark .text-amber-700,
+  html.dark .text-amber-800,   html.dark .text-amber-900   { color: #fcd34d !important; }
+  html.dark .text-red-500,     html.dark .text-red-600,     html.dark .text-red-700,
+  html.dark .text-red-800,     html.dark .text-red-900     { color: #fca5a5 !important; }
+  html.dark .text-purple-500,  html.dark .text-purple-600,  html.dark .text-purple-700,
+  html.dark .text-purple-800,  html.dark .text-purple-900  { color: #d8b4fe !important; }
+  html.dark .text-violet-500,  html.dark .text-violet-600,  html.dark .text-violet-700,
+  html.dark .text-violet-800,  html.dark .text-violet-900  { color: #c4b5fd !important; }
+  html.dark .text-blue-500,    html.dark .text-blue-600,    html.dark .text-blue-700,
+  html.dark .text-blue-800,    html.dark .text-blue-900    { color: #93c5fd !important; }
+  html.dark .text-indigo-500,  html.dark .text-indigo-600,  html.dark .text-indigo-700,
+  html.dark .text-indigo-800,  html.dark .text-indigo-900  { color: #a5b4fc !important; }
+  html.dark .text-green-500,   html.dark .text-green-600,   html.dark .text-green-700,
+  html.dark .text-green-800,   html.dark .text-green-900   { color: #86efac !important; }
+  html.dark .text-orange-500,  html.dark .text-orange-600,  html.dark .text-orange-700,
+  html.dark .text-orange-800,  html.dark .text-orange-900  { color: #fdba74 !important; }
+
+  html.dark .border-emerald-200 { border-color: color-mix(in srgb, #10b981 35%, transparent) !important; }
+  html.dark .border-amber-200   { border-color: color-mix(in srgb, #f59e0b 35%, transparent) !important; }
+  html.dark .border-red-200     { border-color: color-mix(in srgb, #ef4444 35%, transparent) !important; }
+  html.dark .border-purple-200  { border-color: color-mix(in srgb, #a855f7 35%, transparent) !important; }
+  html.dark .border-violet-200  { border-color: color-mix(in srgb, #8b5cf6 35%, transparent) !important; }
+  html.dark .border-blue-200    { border-color: color-mix(in srgb, #3b82f6 35%, transparent) !important; }
+  html.dark .border-indigo-200  { border-color: color-mix(in srgb, #6366f1 35%, transparent) !important; }
+  html.dark .border-green-200   { border-color: color-mix(in srgb, #22c55e 35%, transparent) !important; }
+  html.dark .border-orange-200  { border-color: color-mix(in srgb, #f97316 35%, transparent) !important; }
+
+  /* Hover states */
+  html.dark .hover\:bg-slate-50:hover  { background-color: #1e293b !important; }
+  html.dark .hover\:bg-slate-50\/60:hover,
+  html.dark .hover\:bg-slate-50\/70:hover { background-color: #1e293b !important; }
+  html.dark .hover\:bg-slate-100:hover { background-color: #334155 !important; }
+  /* Coloured hover tints (hover:bg-blue-50 and friends) had no dark rule, so
+     a ghost button such as the cohort card's "Students" lit up near-white on
+     hover. Same hue, low alpha, readable under the button's own text colour. */
+  html.dark .hover\:bg-blue-50:hover,
+  html.dark .hover\:bg-blue-100:hover { background-color: rgba(59,130,246,0.14) !important; }
+  html.dark .hover\:bg-indigo-50:hover,
+  html.dark .hover\:bg-indigo-100:hover { background-color: rgba(99,102,241,0.14) !important; }
+  html.dark .hover\:bg-violet-50:hover,
+  html.dark .hover\:bg-violet-100:hover { background-color: rgba(139,92,246,0.14) !important; }
+  html.dark .hover\:bg-purple-50:hover,
+  html.dark .hover\:bg-purple-100:hover { background-color: rgba(168,85,247,0.14) !important; }
+  html.dark .hover\:bg-emerald-50:hover,
+  html.dark .hover\:bg-emerald-100:hover { background-color: rgba(16,185,129,0.14) !important; }
+  html.dark .hover\:bg-green-50:hover,
+  html.dark .hover\:bg-green-100:hover { background-color: rgba(34,197,94,0.14) !important; }
+  html.dark .hover\:bg-teal-50:hover,
+  html.dark .hover\:bg-teal-100:hover { background-color: rgba(20,184,166,0.14) !important; }
+  html.dark .hover\:bg-sky-50:hover,
+  html.dark .hover\:bg-sky-100:hover { background-color: rgba(14,165,233,0.14) !important; }
+  html.dark .hover\:bg-amber-50:hover,
+  html.dark .hover\:bg-amber-100:hover { background-color: rgba(245,158,11,0.14) !important; }
+  html.dark .hover\:bg-orange-50:hover,
+  html.dark .hover\:bg-orange-100:hover { background-color: rgba(249,115,22,0.14) !important; }
+  html.dark .hover\:bg-red-50:hover,
+  html.dark .hover\:bg-red-100:hover { background-color: rgba(239,68,68,0.14) !important; }
+  html.dark .hover\:bg-rose-50:hover,
+  html.dark .hover\:bg-rose-100:hover { background-color: rgba(244,63,94,0.14) !important; }
+
+  /* Active (pressed) states.
+     These had no dark override at all, while their hover twins above did. On a
+     phone that is the state you actually see: a tap has no hover, it goes
+     straight to :active, so every tap on a card or a secondary button flashed
+     near-white (#f8fafc / #f1f5f9) on a near-black page. Five places relied on
+     it -- the shared clickable card in TableComponents (every admin list), the
+     secondary and ghost Buttons, the Dashboard quick actions and the support
+     issue cards -- so the flash was on essentially every tap in the product.
+     Matched to the hover values so press reads as a deepening, not a flash. */
+  html.dark .active\:bg-slate-50:active  { background-color: #1e293b !important; }
+  html.dark .active\:bg-slate-100:active { background-color: #334155 !important; }
+  html.dark .active\:bg-slate-200:active { background-color: #475569 !important; }
+
+  /* Input/Textarea fields in dark mode */
+  html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  html.dark textarea,
+  html.dark select {
+    background-color: #1e293b !important;
+    border-color:     #334155 !important;
+    color:            #f1f5f9 !important;
+  }
+  /* Chrome autofill.
+     
+     Chrome paints an autofilled field with its own internal style
+     (-internal-light-dark / -internal-autofill-selected). That style wins over
+     `background-color`, `!important` included, so the rule above simply does
+     not apply to a field the browser filled in -- which is why the remembered
+     email rendered as a white box on a dark login card while an untouched
+     field beside it was correctly dark.
+     
+     The only reliable override is an inset box-shadow thick enough to cover
+     the field, plus -webkit-text-fill-color for the text: neither is the
+     property Chrome is overriding, so both land. The transition delay is the
+     long-standing trick for Safari/older Chrome, which re-apply the autofill
+     background shortly after paint.
+     
+     :autofill is the standard selector, -webkit-autofill the prefixed one that
+     still does the work in Chrome. Both are listed; a browser that knows only
+     one ignores the other. */
+  html.dark input:-webkit-autofill,
+  html.dark input:-webkit-autofill:hover,
+  html.dark input:-webkit-autofill:focus,
+  html.dark input:-webkit-autofill:active,
+  html.dark textarea:-webkit-autofill,
+  html.dark select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+    box-shadow:         0 0 0 1000px #1e293b inset !important;
+    -webkit-text-fill-color: #f1f5f9 !important;
+    caret-color:             #f1f5f9 !important;
+    border-color:            #334155 !important;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  /* #475569 on the #0f172a these fields become in dark mode measured 2.36:1 —
+     below even the 3:1 floor for large text, so the hint was close to invisible.
+     #94a3b8 is 6.96:1 on the same background. The light-mode value moves the
+     other way, for the same reason, further down this file. */
+  html.dark input::placeholder,
+  html.dark textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  /* FormSelect in dark mode.
+     Its trigger is a <button> and its menu a <div>, so neither is reached by
+     the input/textarea/select rule above. Without this the field falls back to
+     the generic `.bg-white` override — #0f172a, the modal's own colour — and a
+     dropdown sitting among real inputs looks flat and unfilled. */
+  html.dark .field-trigger {
+    background-color: #1e293b !important;
+    border-color:     #334155 !important;
+    color:            #f1f5f9;
+  }
+  html.dark .field-menu {
+    background-color: #1e293b !important;
+    border-color:     #475569 !important;
+  }
+  /* The search box is a real <input>, so the rule above would give it its own
+     lighter panel inside the menu. Keep it flush. */
+  /* Same :not() chain as the input rule above, so this one outranks it. */
+  html.dark .field-menu input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+    background-color: transparent !important;
+    border-color:     transparent !important;
+    box-shadow:       none !important;
+  }
+  html.dark .field-menu .field-search { background-color: #0f172a !important; border-color: #475569 !important; }
+  /* The line under the search bar. border-slate-100 is a light-mode colour,
+     so in dark mode it vanished and the list looked like it slid under the
+     search box. A visible line and a faint shadow mark where the list starts. */
+  html.dark .field-menu .field-search-bar {
+    border-color: #334155 !important;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.25) !important;
+  }
+  html.dark .field-menu .field-search:focus-within { border-color: var(--accent) !important; }
+  html.dark .field-menu .field-opt:hover,
+  html.dark .field-menu .field-opt.is-focused { background-color: #334155 !important; }
+
+  /* Selected chips and the "you picked this" row both tint with --accent-light,
+     which is near-white. On a dark panel that reads as an inverted block, so
+     dark mode tints with the accent itself at low opacity instead. */
+  html.dark .chip-active,
+  html.dark .field-picked {
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+    border-color: var(--accent) !important;
+    color: #e2e8f0;
+  }
+
+  /* Tables in dark mode */
+  html.dark table    { color: #e2e8f0; }
+  html.dark thead th { color: #94a3b8 !important; background-color: #0f172a !important; }
+  html.dark tbody tr:hover { background-color: #1e293b !important; }
+  html.dark .hover\:bg-slate-50:hover { background-color: #1e293b !important; }
+
+  /* Modal overlay */
+  html.dark .shadow-sm  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3) !important; }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ─── Accent-aware utilities ─────────────────────────────────── */
+.btn-accent {
+  background-color: var(--accent);
+  color: #fff;
+}
+.btn-accent:hover { background-color: var(--accent-hov); }
+
+/* ─── Global accent override — makes hardcoded blue/violet buttons theme-aware ── */
+.accent-btn {
+  background-color: var(--accent) !important;
+  color: #fff !important;
+}
+.accent-btn:hover { background-color: var(--accent-hov) !important; }
+
+/* Auto theme-aware: any button/link with bg-blue-600 or bg-violet-600 picks up accent */
+button.bg-blue-600,
+a.bg-blue-600 {
+  background-color: var(--accent) !important;
+}
+button.bg-blue-600:hover,
+a.bg-blue-600:hover,
+button.hover\:bg-blue-700:hover,
+a.hover\:bg-blue-700:hover,
+button.hover\:bg-blue-500:hover,
+a.hover\:bg-blue-500:hover {
+  background-color: var(--accent-hov) !important;
+}
+
+button.bg-violet-600,
+a.bg-violet-600 {
+  background-color: var(--accent) !important;
+}
+button.bg-violet-600:hover,
+a.bg-violet-600:hover,
+button.hover\:bg-violet-700:hover,
+a.hover\:bg-violet-700:hover,
+button.hover\:bg-violet-500:hover,
+a.hover\:bg-violet-500:hover {
+  background-color: var(--accent-hov) !important;
+}
+
+.ring-accent { --tw-ring-color: var(--accent-ring); }
+
+/* ─── Accent-aware focus rings ───────────────────────────────── */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-ring);
+  border-color: var(--accent) !important;
+}
+
+/* ─── Form controls ──────────────────────────────────────────── */
+/* `--accent` is a plain CSS variable, not a registered Tailwind theme colour,
+   so `border-accent` / `ring-accent/20` compile to nothing. Anything that wants
+   the accent on a form control needs a real rule. */
+.text-accent   { color: var(--accent); }
+.border-accent { border-color: var(--accent); }
+.bg-accent-soft { background-color: var(--accent-light); }
+
+/* Accent used as *text* needs a lighter value in dark mode. The brand accent is
+   tuned to carry white text on a button, so as a foreground on a dark surface it
+   is too dark to read: #2563eb on the card (#0f172a) is 3.45:1, under the 4.5:1
+   floor. Measured on the Achiever login, where "Forgot password?" and "Register
+   as Achiever" both failed.
+
+   `--accent` itself cannot simply be lightened in dark mode: 156 call sites set
+   it as a *background*, and lightening it would wash out every primary button.
+   Only the foreground use is wrong, so only the foreground use is changed.
+   `--accent-ring` is already the light member of each theme palette (#93c5fd
+   on blue, 7.39:1 on the card) and tracks the accent, so a violet or teal theme
+   stays on-brand rather than turning blue.
+
+   The attribute selectors cover the 92 places that set this inline, where a
+   plain class rule cannot reach. Anchoring on `^=` and `; ` is what separates
+   the `color` declaration from `background-color` and `border-color`, whose
+   serialised text also contains the substring "color: var(--accent)" — the
+   browser normalises inline styles to `prop: value;` pairs, so a `color`
+   declaration is always either first or preceded by "; ".
+
+   A stylesheet `!important` outranks a non-important inline style, which is why
+   this works at all. Converting those call sites to `.text-accent` is the
+   durable fix and belongs with the Phase 4 token migration; this makes them
+   readable in the meantime without touching 41 files.
+
+   The `:not(...)` guard is not optional. A handful of badges paint a *light*
+   accent fill and use the solid accent as their text — the FindMentors price pill
+   is `background-color: var(--accent-ring); color: var(--accent)`. Lightening
+   its text to `--accent-ring` set foreground equal to background exactly, a
+   contrast ratio of 1.00: the price vanished. Those elements already sit on a
+   light surface in both themes, so their dark text was right to begin with and
+   the remap must skip them.
+
+   The four exclusions are spelled out one variant at a time because a single
+   shorter prefix cannot express them: the fill may be `--accent`, `--accent-ring`,
+   `--accent-light` or `--accent-muted`, and a substring wide enough to catch all
+   four would also catch `--accent` used for something else on the same element. */
+html.dark .text-accent,
+html.dark [style^="color: var(--accent)"]:not([style*="background-color: var(--accent)"]):not([style*="background-color: var(--accent-ring)"]):not([style*="background-color: var(--accent-light)"]):not([style*="background-color: var(--accent-muted)"]),
+html.dark [style*="; color: var(--accent)"]:not([style*="background-color: var(--accent)"]):not([style*="background-color: var(--accent-ring)"]):not([style*="background-color: var(--accent-light)"]):not([style*="background-color: var(--accent-muted)"]) { color: var(--accent-ring) !important; }
+
+/* Selected chip in the chip pickers. Previously written as
+   `border-accent bg-accent/10 text-accent`, none of which Tailwind generated,
+   so a selected chip looked exactly like an unselected one. */
+.chip-active {
+  border-color: var(--accent);
+  background-color: var(--accent-light);
+  color: var(--accent-text);
+}
+
+/* FormSelect renders a <button>, which the `input:focus` rule above cannot
+   reach. `.is-open` mirrors focus styling while the menu is down, so the field
+   stays visibly active even though focus has moved into the search box. */
+.field-trigger:hover:not(:disabled) { border-color: #cbd5e1; }
+.field-trigger:focus-visible,
+.field-trigger.is-open {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+.field-trigger.is-error {
+  border-color: #f87171;
+  background-color: rgb(254 242 242 / 0.4);
+}
+.field-trigger.is-error:focus-visible,
+.field-trigger.is-error.is-open {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px #fca5a5;
+}
+
+/* A bordered wrapper that should light up when the input inside it is focused —
+   the course/college async searchers, which put an icon and a spinner in the
+   same box as the field. */
+.field-within:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+/* The "you picked this" confirmation row those searchers swap in. */
+.field-picked { border-color: var(--accent-muted); background-color: var(--accent-light); }
+
+/* Error state for native inputs/textareas. Needs !important to outrank the
+   global accent focus rule — otherwise the field turns accent-coloured the
+   moment the user clicks in to fix it, which reads as "resolved". */
+.field-error { border-color: #f87171 !important; background-color: rgb(254 242 242 / 0.4); }
+.field-error:focus { box-shadow: 0 0 0 2px #fca5a5 !important; border-color: #ef4444 !important; }
+
+/* ─── Smooth scrollbar ───────────────────────────────────────── */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ─── Themed scrollbar (uses accent color) ───────────────────── */
+.scroll-accent {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+.scroll-accent::-webkit-scrollbar { width: 6px; }
+.scroll-accent::-webkit-scrollbar-track { background: transparent; }
+.scroll-accent::-webkit-scrollbar-thumb {
+  background-color: var(--accent);
+  border-radius: 99px;
+  opacity: 0.7;
+}
+.scroll-accent::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-hov);
+}
+
+/* ─── Global scrollbar — accent color everywhere ─────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--accent);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-hov);
+}
+
+/* ─── Page transition helper ─────────────────────────────────── */
+.page-fade-in {
+  animation: fadeIn 0.15s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Inter', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+/* ── Responsive data tables ─────────────────────────────────────────────────
+   Wide multi-column tables scroll horizontally inside their card. On touch
+   devices give momentum scrolling + a thin always-visible scrollbar so it's
+   obvious there's more to the right, and a soft right-edge fade as a hint. */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 640px) {
+  .overflow-x-auto { scrollbar-width: thin; }
+  .overflow-x-auto::-webkit-scrollbar { height: 6px; }
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 9999px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION LAYER
+   ───────────────────────────────────────────────────────────────────────────
+   One animation system for all four portals. Component files use these utility
+   classes rather than defining their own keyframes, so timing and easing stay
+   consistent everywhere and there is a single place to retune them.
+
+   Two rules this layer keeps:
+     · Motion is short and purposeful — it explains what changed, it does not
+       perform. Nothing here runs longer than 500ms.
+     · Everything collapses under prefers-reduced-motion. A student on a low-end
+       Android or with vestibular sensitivity gets the same product, still.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Durations — the vocabulary. */
+  --mo-fast:   140ms;
+  --mo-base:   220ms;
+  --mo-slow:   380ms;
+
+  /* Easings. `out` for things arriving, `spring` for anything that should feel
+     physical (press, lift), `in-out` for state changes. */
+  --mo-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --mo-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --mo-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
+@keyframes mo-fade-up   { from { opacity: 0; transform: translate3d(0, 12px, 0); }
+                          to   { opacity: 1; transform: none; } }
+@keyframes mo-fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mo-scale-in  { from { opacity: 0; transform: scale(0.96); }
+                          to   { opacity: 1; transform: none; } }
+@keyframes mo-slide-r   { from { opacity: 0; transform: translate3d(-14px, 0, 0); }
+                          to   { opacity: 1; transform: none; } }
+@keyframes mo-shimmer   { 100% { transform: translateX(100%); } }
+@keyframes mo-float     { 0%, 100% { transform: translateY(0); }
+                          50%      { transform: translateY(-8px); } }
+@keyframes mo-pan       { 0% { background-position: 0% 50%; }
+                          50% { background-position: 100% 50%; }
+                          100% { background-position: 0% 50%; } }
+@keyframes mo-ring      { 0%   { box-shadow: 0 0 0 0 var(--accent-ring); opacity: 1; }
+                          100% { box-shadow: 0 0 0 12px transparent; opacity: 0; } }
+
+/* ── Entrances ───────────────────────────────────────────────────────────── */
+.mo-in       { animation: mo-fade-up  var(--mo-slow) var(--mo-out) both; }
+
+/* Page-level entrance. Deliberately opacity-only, NOT mo-in.
+   Chrome treats an element with a current *or filling* transform animation as
+   a containing block for position:fixed descendants — even once the animation
+   has ended holding `transform: none`, because fill-mode keeps it "current".
+   Every page here renders its modals inside this wrapper, so using a transform
+   animation re-anchored all ~117 `fixed inset-0` modals to the scrolling page
+   box instead of the viewport: the modal centred itself in the full scroll
+   height, pushing its header off the top of the screen and adding a screenful
+   of scroll. Fading has no such side effect. */
+.mo-page     { animation: mo-fade-in  var(--mo-slow) var(--mo-out) both; }
+.mo-fade     { animation: mo-fade-in  var(--mo-base) var(--mo-out) both; }
+.mo-pop      { animation: mo-scale-in var(--mo-base) var(--mo-spring) both; }
+.mo-slide    { animation: mo-slide-r  var(--mo-base) var(--mo-out) both; }
+
+/* Stagger a list without touching each child in JS. Caps at 12 so a 500-row
+   table never waits three seconds to finish appearing. */
+.mo-stagger > *              { animation: mo-fade-up var(--mo-slow) var(--mo-out) both; }
+.mo-stagger > *:nth-child(1) { animation-delay: 20ms; }
+.mo-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.mo-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.mo-stagger > *:nth-child(4) { animation-delay: 110ms; }
+.mo-stagger > *:nth-child(5) { animation-delay: 140ms; }
+.mo-stagger > *:nth-child(6) { animation-delay: 170ms; }
+.mo-stagger > *:nth-child(7) { animation-delay: 200ms; }
+.mo-stagger > *:nth-child(8) { animation-delay: 230ms; }
+.mo-stagger > *:nth-child(n+9) { animation-delay: 260ms; }
+
+/* Table rows get a fade-only stagger. `transform` on a <tr> is honoured
+   inconsistently across browsers — it can create a containing block and shift
+   cell borders — so rows change opacity and nothing else. Same delays. */
+.mo-stagger-fade > *              { animation: mo-fade-in var(--mo-base) var(--mo-out) both; }
+.mo-stagger-fade > *:nth-child(1) { animation-delay: 20ms; }
+.mo-stagger-fade > *:nth-child(2) { animation-delay: 45ms; }
+.mo-stagger-fade > *:nth-child(3) { animation-delay: 70ms; }
+.mo-stagger-fade > *:nth-child(4) { animation-delay: 95ms; }
+.mo-stagger-fade > *:nth-child(5) { animation-delay: 120ms; }
+.mo-stagger-fade > *:nth-child(6) { animation-delay: 145ms; }
+.mo-stagger-fade > *:nth-child(7) { animation-delay: 170ms; }
+.mo-stagger-fade > *:nth-child(n+8) { animation-delay: 195ms; }
+
+/* ── Interaction ─────────────────────────────────────────────────────────── */
+/* Cards that respond to the cursor without jumping the layout. */
+.mo-lift {
+  transition: transform var(--mo-base) var(--mo-out),
+              box-shadow var(--mo-base) var(--mo-out),
+              border-color var(--mo-base) var(--mo-out);
+  will-change: transform;
+}
+.mo-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -12px rgba(15, 23, 42, 0.22),
+              0 4px 10px -6px rgba(15, 23, 42, 0.12);
+}
+html.dark .mo-lift:hover {
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.65);
+}
+
+/* Tactile press — the thing that makes a UI feel responsive on touch. */
+.mo-press { transition: transform var(--mo-fast) var(--mo-out); }
+.mo-press:active { transform: scale(0.97); }
+
+/* Focus ring that matches the active accent theme. */
+.mo-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+  transition: box-shadow var(--mo-fast) var(--mo-out);
+}
+
+/* ── Keyboard focus, for everything that did not opt in ──────────────────────
+ *
+ * `.mo-ring` is the deliberate focus ring and the shared <Button> carries it.
+ * Most buttons in the app are not that component though: the achiever portal
+ * alone hand-rolls 119 <button> elements, and only 13 of them had ANY focus
+ * style — six of its twelve screens had none at all. Tabbing through them
+ * showed nothing moving, which makes the portal unusable without a mouse.
+ *
+ * Rather than rewrite every call site, this gives every interactive element a
+ * visible ring by default. `:focus-visible` means it appears for keyboard and
+ * assistive navigation only — a mouse click never draws it — so nothing about
+ * the pointer experience changes.
+ *
+ * Anything carrying `.mo-ring` is excluded so the deliberate ring wins and the
+ * two never double up. `outline` rather than `box-shadow` here: a box-shadow
+ * would be clipped by the `overflow-hidden` cards these buttons often sit in,
+ * and `outline-offset` keeps it clear of the button's own border.
+ *
+ * NO `border-radius` here, and that is the whole point. An earlier version set
+ * `border-radius: inherit`, meaning to make the ring follow the control's
+ * corners. `inherit` takes the PARENT's value, which for an input sitting in a
+ * plain wrapper div is 0 — so focusing a `rounded-xl` field squared off its
+ * corners while the field below it stayed rounded. Every browser that supports
+ * `:focus-visible` already draws the outline around the element's own
+ * border-radius, so the correct move is to set nothing at all.
+ */
+:where(button, [role='button'], a[href], summary):not(.mo-ring):focus-visible,
+:where(input, select, textarea):not(.mo-ring):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* One-shot pulse to draw the eye to something that just changed. */
+.mo-pulse { animation: mo-ring 900ms var(--mo-out) 2; }
+
+/* ── Surfaces ────────────────────────────────────────────────────────────── */
+/* Loading shimmer — reads as "content is coming", unlike a bare grey block. */
+.mo-shimmer { position: relative; overflow: hidden; }
+.mo-shimmer::after {
+  content: '';
+  position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent,
+              rgba(255, 255, 255, 0.55), transparent);
+  animation: mo-shimmer 1.4s infinite;
+}
+html.dark .mo-shimmer::after {
+  background: linear-gradient(90deg, transparent,
+              rgba(255, 255, 255, 0.07), transparent);
+}
+
+/* Accent gradient text, themed — follows whichever accent is active. */
+.mo-gradient-text {
+  background: linear-gradient(100deg, var(--accent), var(--accent-hov), var(--accent));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mo-pan 6s linear infinite;
+}
+
+/* Frosted panel for overlays and hero cards. */
+.mo-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+html.dark .mo-glass {
+  background: rgba(15, 23, 42, 0.66);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+/* Soft accent glow behind hero elements. */
+.mo-glow { position: relative; }
+.mo-glow::before {
+  content: '';
+  position: absolute; inset: -30%;
+  background: radial-gradient(closest-side, var(--accent-light), transparent 70%);
+  opacity: 0.9;
+  z-index: -1;
+  animation: mo-float 7s var(--mo-in-out) infinite;
+}
+
+.mo-float { animation: mo-float 6s var(--mo-in-out) infinite; }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Not a nicety. Vestibular disorders make parallax and float genuinely
+   unpleasant, and low-end Android drops frames on continuous animation. Content
+   still arrives — it simply arrives without moving. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .mo-in, .mo-fade, .mo-pop, .mo-slide, .mo-stagger > *, .mo-stagger-fade > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .mo-lift:hover { transform: none; }
+  .mo-glow::before, .mo-float { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO / MARKETING MOTION
+   Heavier effects than the app layer — used only on the landing page, where a
+   little spectacle is the job. Still bounded: nothing loops faster than 8s, and
+   all of it stops under prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes mo-drift-a { 0%,100% { transform: translate3d(0,0,0) scale(1); }
+                        33%     { transform: translate3d(6%, -8%, 0) scale(1.08); }
+                        66%     { transform: translate3d(-5%, 5%, 0) scale(0.95); } }
+@keyframes mo-drift-b { 0%,100% { transform: translate3d(0,0,0) scale(1); }
+                        50%     { transform: translate3d(-8%, 6%, 0) scale(1.12); } }
+@keyframes mo-sheen   { 0%   { transform: translateX(-120%) skewX(-18deg); }
+                        60%,100% { transform: translateX(220%) skewX(-18deg); } }
+@keyframes mo-grid    { from { background-position: 0 0; }
+                        to   { background-position: 28px 28px; } }
+@keyframes mo-bob     { 0%,100% { transform: translateY(0); opacity: 0.55; }
+                        50%     { transform: translateY(6px); opacity: 1; } }
+
+/* Slow-drifting colour fields. Two speeds so they never move in lockstep. */
+.mo-orb-a { animation: mo-drift-a 18s var(--mo-in-out) infinite; }
+.mo-orb-b { animation: mo-drift-b 24s var(--mo-in-out) infinite; }
+
+/* The dot grid creeps by one cell — enough to feel alive, not enough to notice. */
+.mo-grid-pan { animation: mo-grid 8s linear infinite; }
+
+/* A light sweep across a button on hover. */
+.mo-sheen { position: relative; overflow: hidden; }
+.mo-sheen::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+}
+.mo-sheen:hover::after { animation: mo-sheen 900ms var(--mo-out); }
+
+/* Scroll hint at the bottom of the hero. */
+.mo-bob { animation: mo-bob 2.2s var(--mo-in-out) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-orb-a, .mo-orb-b, .mo-grid-pan, .mo-bob { animation: none; }
+  .mo-sheen:hover::after { animation: none; }
+}
+
+/* ── Form controls ───────────────────────────────────────────────────────────
+ * 358 of the ~430 form fields in this app are raw <input>/<textarea> written
+ * inline rather than the shared <Input>, each with its own Tailwind classes.
+ * That is why forms look slightly different from screen to screen: some fields
+ * get a focus ring, some do not; heights and radii drift a few pixels.
+ *
+ * Restyling them one by one means editing 358 call sites. Doing it here fixes
+ * every one at once, and the day a field is migrated to <Input> it already
+ * matches. Only the properties responsible for the inconsistency are set —
+ * layout classes on each field still win, because these are single-class
+ * selectors and Tailwind's utilities are equally specific but come later.
+ *
+ * Deliberately not matched: checkboxes, radios, ranges and file inputs, which
+ * have their own affordances; and the search box inside a FormSelect menu,
+ * which is styled as part of that component.
+ */
+input[type="text"], input[type="email"], input[type="password"],
+input[type="number"], input[type="url"], input[type="tel"],
+input[type="date"], input[type="time"], input[type="datetime-local"],
+input[type="search"], input:not([type]), textarea, select {
+  border-radius: 0.75rem;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+
+input[type="text"]:hover:not(:disabled), input[type="email"]:hover:not(:disabled),
+input[type="password"]:hover:not(:disabled), input[type="number"]:hover:not(:disabled),
+input[type="url"]:hover:not(:disabled), input[type="tel"]:hover:not(:disabled),
+input[type="date"]:hover:not(:disabled), input[type="search"]:hover:not(:disabled),
+input:not([type]):hover:not(:disabled), textarea:hover:not(:disabled), select:hover:not(:disabled) {
+  border-color: #cbd5e1;
+}
+
+/* One focus treatment everywhere, in the portal's own accent. */
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus,
+input[type="number"]:focus, input[type="url"]:focus, input[type="tel"]:focus,
+input[type="date"]:focus, input[type="time"]:focus, input[type="datetime-local"]:focus,
+input[type="search"]:focus, input:not([type]):focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+input:disabled, textarea:disabled, select:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  background-color: #f8fafc;
+}
+
+/* This rule, not the `placeholder:text-*` utility on each field, is what decides
+   the colour: it is unlayered, and unlayered CSS outranks anything in Tailwind's
+   utilities layer however specific the class looks. Change it here.
+
+   #94a3b8 on white measured 2.56:1 — under the 4.5:1 minimum and under the 3:1
+   floor as well, which on a phone outdoors made every hint guesswork. #64748b
+   is 4.76:1. Dark mode needs the opposite adjustment; see the html.dark rule. */
+input::placeholder, textarea::placeholder { color: #64748b; }
+
+/* The FormSelect menu styles its own search field. */
+.field-menu input { border-radius: 0.5rem; box-shadow: none; }
+.field-menu input:focus { box-shadow: none; border-color: var(--accent); }
+/* The search row draws its own field (icon, input, clear button inside one
+   border), so the input itself stays bare and the browser's own clear "x"
+   is hidden in favour of the FormSelect one. */
+.field-menu .field-search input,
+.field-menu .field-search input:focus {
+  border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; outline: none !important;
+}
+.field-menu .field-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+
+/* Long forms in a modal read better with room between fields than without. */
+/* Implicit grid columns must not outgrow the grid.
+   A grid written `grid lg:grid-cols-2` has NO explicit columns below lg, so its
+   items land in one IMPLICIT column sized by grid-auto-columns, which defaults
+   to `auto` -- and an `auto` track resolves to max-content, which ignores the
+   container's width. On My Score that made three cards 314px wide inside a
+   288px column at 320px, so the page scrolled sideways while
+   documentElement.scrollWidth still read 320: the overflow was inside
+   `main.flex-1.overflow-y-auto`, not on the document.
+   90 grids in the app are written this way; they only overflow when their
+   content happens to be wide enough, which is why it surfaces one screen at a
+   time. minmax(0, 1fr) lets the track shrink and the content wrap.
+   Explicit grid-cols-N tracks are untouched, and nothing here uses
+   grid-flow-col or auto-cols-*, so no column-flow layout is affected. */
+.grid { grid-auto-columns: minmax(0, 1fr); }
+
+.form-grid { display: grid; gap: 0.875rem; }
+
+/* Dark mode sets input border-color with !important (see the block above), so
+ * the hover and focus borders from the form-control rules would never apply.
+ * Restate them at the same weight rather than weakening the base rule — the
+ * focus ring is the only thing telling someone which field they are typing in.
+ */
+html.dark input[type="text"]:hover:not(:disabled),
+html.dark input[type="email"]:hover:not(:disabled),
+html.dark input[type="password"]:hover:not(:disabled),
+html.dark input[type="number"]:hover:not(:disabled),
+html.dark input[type="url"]:hover:not(:disabled),
+html.dark input[type="tel"]:hover:not(:disabled),
+html.dark input[type="date"]:hover:not(:disabled),
+html.dark input[type="search"]:hover:not(:disabled),
+html.dark input:not([type]):hover:not(:disabled),
+html.dark textarea:hover:not(:disabled),
+html.dark select:hover:not(:disabled) {
+  border-color: #475569 !important;
+}
+
+html.dark input[type="text"]:focus, html.dark input[type="email"]:focus,
+html.dark input[type="password"]:focus, html.dark input[type="number"]:focus,
+html.dark input[type="url"]:focus, html.dark input[type="tel"]:focus,
+html.dark input[type="date"]:focus, html.dark input[type="time"]:focus,
+html.dark input[type="datetime-local"]:focus, html.dark input[type="search"]:focus,
+html.dark input:not([type]):focus, html.dark textarea:focus, html.dark select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+html.dark input:disabled, html.dark textarea:disabled, html.dark select:disabled {
+  background-color: #0f172a !important;
+}
+
+/* Horizontal tab strips on phones: hide the scrollbar, keep the swipe. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Tables → cards on phones (hooks/useMobileCardTables.js) ─────────────
+   Each row becomes a card; each cell a "label  value" line, the label coming
+   from its column header. The first cell is the card's title. Cells with no
+   header (actions) sit on their own line, right-aligned. */
+@media (max-width: 767px) {
+  table[data-cards] { display: block; width: 100%; min-width: 0 !important; }
+  table[data-cards] thead { display: none; }
+  table[data-cards] tbody { display: block; width: 100%; }
+  table[data-cards] tr {
+    display: block; width: 100%; padding: 12px 16px;
+    border-bottom: 1px solid rgb(148 163 184 / 0.18);
+  }
+  table[data-cards] td {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    width: 100%; padding: 3px 0 !important; border: 0 !important;
+    text-align: right; white-space: normal !important; word-break: break-word;
+  }
+  table[data-cards] td::before {
+    content: attr(data-label); flex: 0 0 38%; text-align: left;
+    font-size: 12px; font-weight: 500; color: #64748b;
+  }
+  table[data-cards] td[data-label=""]::before { display: none; }
+  table[data-cards] td[data-label=""] { justify-content: flex-end; }
+  /* Row = card: title + actions on the first line, details underneath. */
+  table[data-cards] tr { display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 8px; }
+  table[data-cards] td[data-role="sno"],
+  table[data-cards] td[data-empty] { display: none; }
+  table[data-cards] td[data-role="title"] {
+    order: 0; flex: 1 1 0; width: auto; min-width: 0; display: block; text-align: left;
+    font-weight: 600; font-size: 15px; padding-top: 8px !important;
+  }
+  table[data-cards] td[data-role="title"]::before { display: none; }
+  table[data-cards] td[data-role="actions"] { order: 1; width: auto; flex: 0 0 auto; }
+  /* Long text (descriptions, notes): label on its own line, the text under it
+     left-aligned and full width. Right-aligned beside a 38% label, a sentence
+     wrapped into a ragged column. Opt in per cell with className="cell-wide". */
+  table[data-cards] td.cell-wide {
+    flex-direction: column; align-items: stretch; gap: 2px;
+    text-align: left; max-width: none; overflow: visible; white-space: normal !important;
+  }
+  table[data-cards] td:not([data-role="title"]):not([data-role="actions"]) { order: 2; }
+  /* The scroll box around a table has nothing left to scroll. */
+  .overflow-x-auto:has(table[data-cards]) { overflow-x: visible; }
+}
+
+/* Landing navbar section pill — explicit both-theme colours (the generic dark
+   remap left bg-slate-100/80 pale grey with faint text on the dark header). */
+.nav-pill { background: #f1f5f9; border: 1px solid #e2e8f0; }
+.nav-pill-on { background: #ffffff; color: #6d28d9; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+.nav-pill-off { color: #475569; }
+.nav-pill-off:hover { color: #0f172a; }
+html.dark .nav-pill { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
+html.dark .nav-pill .nav-pill-on { background: #7c3aed !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(124,58,237,.35); }
+html.dark .nav-pill-off { color: #cbd5e1; }
+html.dark .nav-pill-off:hover { color: #ffffff; background: rgba(255,255,255,.06); }
+.nav-sheet { background: #ffffff; }
+html.dark .nav-sheet { background: #0b1120; }

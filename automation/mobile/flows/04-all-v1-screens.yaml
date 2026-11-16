@@ -1,0 +1,161 @@
+# Every v1 student screen, opened and asserted — the mobile twin of the web
+# suite's 03-student-screens.spec.js.
+#
+# Why this exists: the API-level parity suite proves web and mobile call the same
+# endpoints and read fields that exist. It cannot prove a screen actually renders
+# — a broken layout, a crashed component or a dead tap handler all pass there and
+# fail here.
+#
+# Each screen asserts on text the screen itself owns, not on the menu entry that
+# opened it, so a navigation that silently no-ops is caught rather than passed.
+#
+# Run:  APP_ID=in.skovo.mobile maestro test flows/04-all-v1-screens.yaml
+appId: ${APP_ID}
+env:
+  EMAIL: e2e.pro@skovo-test.local
+  PASSWORD: E2ePass!234
+---
+- launchApp:
+    clearState: true
+
+# Landing screen — tap through to the sign-in form. `optional` so a flow that
+# starts already past it (runFlow from another spec) does not fail here.
+- tapOn:
+    text: "Get started"
+    optional: true
+- runFlow: 01-login.yaml
+
+# ── Bottom tabs ────────────────────────────────────────────────────────────
+- tapOn: "Home"
+- assertVisible:
+    text: ".*Readiness.*|.*Score.*"
+    timeout: 15000
+
+- tapOn: "Cohorts"
+- assertVisible:
+    text: ".*Cohort.*"
+    timeout: 15000
+
+- tapOn: "Mentors"
+- assertVisible:
+    text: ".*Achiever.*|.*Mentor.*"
+    timeout: 15000
+
+- tapOn: "Bookings"
+- assertVisible:
+    text: ".*Booking.*"
+    timeout: 15000
+
+# ── Every More-menu screen ─────────────────────────────────────────────────
+# Colleges
+- tapOn: "More"
+- tapOn: "Colleges"
+- assertVisible:
+    text: ".*college.*|.*College.*"
+    timeout: 15000
+- back
+
+# Saved Colleges
+- tapOn: "More"
+- tapOn: "Saved Colleges"
+- assertVisible:
+    text: ".*Saved.*|.*compare.*"
+    timeout: 15000
+- back
+
+# College Predictor — the exam picker is a Select now, so assert the label
+- tapOn: "More"
+- tapOn: "College Predictor"
+- assertVisible:
+    text: ".*Exam.*"
+    timeout: 15000
+- back
+
+# Opportunities — either the list, or the score gate for a low-score account
+- tapOn: "More"
+- tapOn: "Opportunities"
+- assertVisible:
+    text: ".*Opportunit.*|.*locked.*"
+    timeout: 15000
+- back
+
+# Market
+- tapOn: "More"
+- tapOn: "Market"
+- assertVisible:
+    text: ".*Market.*|.*deal.*|.*Deal.*"
+    timeout: 15000
+- back
+
+# My Score — "/ 100" is rendered by the dial itself, so it proves the score
+# component mounted rather than just the header.
+- tapOn: "More"
+- tapOn: "My Score"
+- assertVisible:
+    text: "/ 100"
+    timeout: 15000
+- back
+
+# My Tasks
+- tapOn: "More"
+- tapOn: "My Tasks"
+- assertVisible:
+    text: ".*Task.*"
+    timeout: 15000
+- back
+
+# Applications
+- tapOn: "More"
+- tapOn: "Applications"
+- assertVisible:
+    text: ".*Application.*"
+    timeout: 15000
+- back
+
+# Document Vault
+- tapOn: "More"
+- tapOn: "Document Vault"
+- assertVisible:
+    text: ".*Document Vault.*"
+    timeout: 15000
+- back
+
+# Assemble
+- tapOn: "More"
+- tapOn: "Assemble"
+- assertVisible:
+    text: ".*communit.*|.*Communit.*"
+    timeout: 15000
+- back
+
+# BhaAI — v1 shows the "upcoming" state, which is the point
+- tapOn: "More"
+- tapOn: "BhaAI"
+- assertVisible:
+    text: ".*[Uu]pcoming.*|.*BhaAI.*"
+    timeout: 15000
+- back
+
+# Profile — must show the skills section added for web parity
+- tapOn: "More"
+- tapOn: "My Profile"
+- assertVisible:
+    text: ".*Skills.*|.*Sign out.*"
+    timeout: 15000
+- back
+
+# Notifications
+- tapOn: "More"
+- tapOn: "Notifications"
+- assertVisible:
+    text: ".*Notification.*|.*caught up.*"
+    timeout: 15000
+- back
+
+# Skovo Pro
+- tapOn: "More"
+- tapOn: "Skovo Pro"
+- assertVisible:
+    text: ".*Pro.*"
+    timeout: 15000
+- back

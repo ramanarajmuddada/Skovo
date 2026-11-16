@@ -1,0 +1,209 @@
+{
+  "runner": "playwright",
+  "finishedAt": "2026-09-06T10:31:18.753Z",
+  "runStatus": "passed",
+  "totalTests": 18,
+  "untaggedTests": 0,
+  "cases": [
+    {
+      "id": "UI04-001",
+      "status": "passed",
+      "title": "UI04-001 [P2] the login form is completable with the keyboard alone",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 220,
+      "durationMs": 1962,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-002",
+      "status": "passed",
+      "title": "UI04-002 [P2] the cohort list is operable from the keyboard",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 379,
+      "durationMs": 2350,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-003",
+      "status": "passed",
+      "title": "UI04-003 [P2] focused elements show a visible focus ring",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 182,
+      "durationMs": 1819,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-004",
+      "status": "passed",
+      "title": "UI04-004 [P2] a skip link is present at the top of the page",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 202,
+      "durationMs": 1931,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-005",
+      "status": "passed",
+      "title": "UI04-005 [P2] headings run in order with no skipped levels",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 104,
+      "durationMs": 1872,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-006",
+      "status": "passed",
+      "title": "UI04-006 [P2] every input has a programmatic label",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 122,
+      "durationMs": 1959,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-007",
+      "status": "passed",
+      "title": "UI04-007 [P2] and UI04-008 validation errors are associated with their field",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 395,
+      "durationMs": 5157,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-008",
+      "status": "passed",
+      "title": "UI04-007 [P2] and UI04-008 validation errors are associated with their field",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 395,
+      "durationMs": 5157,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-009",
+      "status": "passed",
+      "title": "UI04-009 [P2] icon-only buttons carry an aria-label",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 145,
+      "durationMs": 1946,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-010",
+      "status": "passed",
+      "title": "UI04-010 [P2] a modal declares its role and closes on Escape",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 243,
+      "durationMs": 2480,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-011",
+      "status": "passed",
+      "title": "UI04-011 [P2] toasts are announced to assistive technology",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 268,
+      "durationMs": 1767,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-012",
+      "status": "passed",
+      "title": "UI04-012 [P2] tables carry header semantics",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 279,
+      "durationMs": 2073,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-013",
+      "status": "passed",
+      "title": "UI04-013 [P2] and UI04-014 images carry meaningful alt text",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 162,
+      "durationMs": 2197,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-014",
+      "status": "passed",
+      "title": "UI04-013 [P2] and UI04-014 images carry meaningful alt text",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 162,
+      "durationMs": 2197,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-015",
+      "status": "passed",
+      "title": "UI04-015 [P2] body text meets WCAG AA contrast",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 294,
+      "durationMs": 2222,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-016",
+      "status": "passed",
+      "title": "UI04-016 [P2] status is not conveyed by colour alone",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 322,
+      "durationMs": 2183,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-017",
+      "status": "passed",
+      "title": "UI04-017 [P2] animation is reduced when the OS asks",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 341,
+      "durationMs": 2345,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-018",
+      "status": "passed",
+      "title": "UI04-018 [P2] nothing is lost at 200% zoom",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 366,
+      "durationMs": 2064,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-019",
+      "status": "passed",
+      "title": "UI04-019 [P2] the three journeys expose a complete accessibility tree",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 432,
+      "durationMs": 7482,
+      "error": null,
+      "claimedBy": 1
+    },
+    {
+      "id": "UI04-020",
+      "status": "passed",
+      "title": "UI04-020 [P2] the document declares its language",
+      "file": "tests/43-ui04-accessibility.spec.js",
+      "line": 97,
+      "durationMs": 1141,
+      "error": null,
+      "claimedBy": 1
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+# The achiever portal on mobile — every tab and every Profile-menu screen.
+#
+# This covers the surface that was most broken before: the dashboard showed
+# 0 Sessions / 0 Cohorts / 0 Courses and ₹0 available next to a real
+# "Total earned ₹8,400", because it read fields the earnings payload does not
+# contain. The assertions below are written against the corrected tiles, so the
+# same regression would fail here.
+#
+# Run:  APP_ID=in.skovo.mobile maestro test flows/05-achiever-portal.yaml
+appId: ${APP_ID}
+env:
+  EMAIL: e2e.achiever@skovo-test.local
+  PASSWORD: E2ePass!234
+---
+- launchApp:
+    clearState: true
+
+# Landing screen — tap through to the sign-in form. `optional` so a flow that
+# starts already past it (runFlow from another spec) does not fail here.
+- tapOn:
+    text: "Get started"
+    optional: true
+
+
+- assertVisible: "you@email.com"
+- tapOn: "you@email.com"
+- inputText: ${EMAIL}
+- tapOn: "Your password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    text: ".*Sign in.*|.*Log in.*"
+
+- assertVisible:
+    text: "ACHIEVER PORTAL"
+    timeout: 20000
+
+# ── Dashboard tiles ────────────────────────────────────────────────────────
+# "Total earned" alone is not enough — it rendered correctly while everything
+# beside it was zero. Assert the labels of the tiles that were broken.
+- assertVisible:
+    text: ".*Total earned.*"
+    timeout: 15000
+- assertVisible: "Bookings"
+- assertVisible: "Cohorts"
+- assertVisible: "Courses"
+
+# ── Tabs ───────────────────────────────────────────────────────────────────
+- tapOn: "Cohorts"
+- assertVisible:
+    text: ".*Cohort.*"
+    timeout: 15000
+
+- tapOn: "Bookings"
+# Two tabs now: 1-on-1 and cohort enrolments
+- assertVisible:
+    text: ".*1-on-1.*"
+    timeout: 15000
+- tapOn:
+    text: ".*Cohorts.*"
+
+- tapOn: "Availability"
+- assertVisible:
+    text: ".*[Aa]vailability.*|.*slot.*"
+    timeout: 15000
+
+- tapOn: "Profile"
+- assertVisible:
+    text: ".*Edit profile.*"
+    timeout: 15000
+
+# ── Profile menu → the screens built for web parity ───────────────────────
+- tapOn: "My cohorts"
+- assertVisible:
+    text: ".*Cohort.*"
+    timeout: 15000
+- back
+
+- tapOn: "Profile"
+- tapOn: "My courses"
+- assertVisible:
+    text: ".*Course.*"
+    timeout: 15000
+- back
+
+- tapOn: "Profile"
+- tapOn: "Coupons"
+- assertVisible:
+    text: ".*[Cc]oupon.*"
+    timeout: 15000
+- back
+
+- tapOn: "Profile"
+- tapOn: "My domains"
+- assertVisible:
+    text: ".*[Dd]omain.*"
+    timeout: 15000
+- back
+
+- tapOn: "Profile"
+- tapOn: "Earnings & payouts"
+- assertVisible:
+    text: ".*[Ee]arning.*|.*[Pp]ayout.*"
+    timeout: 15000
+- back
+
+- tapOn: "Profile"
+- tapOn: "Notifications"
+- assertVisible:
+    text: ".*Notification.*|.*caught up.*"
+    timeout: 15000
+- back
+
+# ── Verification ───────────────────────────────────────────────────────────
+# The trust ladder shipped on web first, which left mobile achievers stranded:
+# a phone signup lands at L0, cannot create anything, and until this screen
+# existed there was nothing on the app explaining why. The assertions below are
+# written against the capability tiles, so a regression that hides the achiever's
+# tier — or the reason they are blocked — fails here.
+- tapOn: "Profile"
+- tapOn: "Verification"
+- assertVisible:
+    text: ".*Listed.*"
+    timeout: 15000
+- assertVisible:
+    text: ".*Can charge.*"
+- assertVisible:
+    text: ".*Ages 14.*"
+# The agreements section works fully on mobile (no file picker needed), so it
+# must render even when documents still have to be uploaded on the web portal.
+- assertVisible:
+    text: ".*Agreements.*"
+- assertVisible:
+    text: ".*Your evidence.*"
+- back

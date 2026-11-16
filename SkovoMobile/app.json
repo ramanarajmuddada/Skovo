@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "SKOVO",
+    "slug": "skovo-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "skovo",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#6366F1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.skovo.mobile"
+    },
+    "android": {
+      "package": "in.skovo.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#6366F1"
+      }
+    },
+    "extra": {
+      "//": "Set your backend base URL here (LAN IP in dev so a phone can reach it).",
+      "apiBaseUrl": "http://192.168.1.34:5000/v1",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

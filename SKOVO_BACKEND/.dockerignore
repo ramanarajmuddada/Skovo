@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Flask runtime data
+flask_session/
+portal/uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Migrations (keep — needed for flask db upgrade)
+# migrations/
+
+# Tests
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/

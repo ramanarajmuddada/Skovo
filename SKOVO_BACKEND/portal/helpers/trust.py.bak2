@@ -1,0 +1,356 @@
+"""
+Achiever trust tiers — the capability layer every guard reads.
+
+`achievers.is_verified` used to be one boolean asserting two unrelated things:
+"this person is who they claim" AND "this person is safe alone with a
+14-year-old". Those are different checks at wildly different costs, and
+collapsing them forced a bad trade — verify slowly and starve supply, or verify
+fast and carry child-safety risk.
+
+The ladder replaces it:
+
+    L0 applied      email OTP only. Not listed, cannot create anything.
+    L1 identity     govt ID + selfie + phone. Listed; FREE cohorts only.
+    L2 credential   achievement proof validated. May charge money.
+    L3 bgv_cleared  criminal + employment check. May teach 14-17 students.
+    L4 featured     founder promotion. Raised ceiling, homepage placement.
+
+What each tier unlocks is CONFIG, in `achiever_trust_rules` — the same reason
+score_event_rules exists. Nothing in this module hardcodes a capability; it
+reads the table. The tier CONSTANTS below are ordering, not policy.
+
+Usage in a route:
+
+    from portal.helpers.trust import require_capability, CAP_CHARGE
+    err = require_capability(achiever_id, CAP_CHARGE)
+    if err:
+        return err          # a ready-made 403 response
+
+Every read is one indexed row + one PK join (sp_achiever_trust_get), so calling
+this in a guard costs the same as the sp_achievers_get it replaced.
+"""
+import logging
+
+from flask import jsonify
+
+from portal.helpers.sp import call_proc, call_proc_one
+
+logger = logging.getLogger("skovo")
+
+# ── Tier ordering ─────────────────────────────────────────────────────────────
+L_APPLIED = 0
+L_IDENTITY = 1
+L_CREDENTIAL = 2
+L_BGV = 3
+L_FEATURED = 4
+
+# ── Capabilities — column names in achiever_trust_rules ───────────────────────
+CAP_LIST = 'can_list'                  # appears in Find Achievers
+CAP_CREATE_FREE = 'can_create_free'    # may create free cohorts
+CAP_CHARGE = 'can_charge'              # may charge money
+CAP_MINORS = 'can_teach_minors'        # may take 14-17 students
+
+# Message shown when a capability is missing. Keyed by capability so the copy
+# tells the achiever what to DO, not merely that they were refused.
+_DENIED = {
+    CAP_LIST: ("Your achiever profile is not live yet. Complete your "
+               "application and an admin will review it."),
+    CAP_CREATE_FREE: ("Your achiever profile is pending verification. "
+                      "You can create sessions once your identity is confirmed."),
+    CAP_CHARGE: ("You can't charge for sessions yet — that unlocks once your "
+                 "achievement is verified. Free cohorts are available now."),
+    CAP_MINORS: ("This action involves a student under 18, which requires a "
+                 "completed background check."),
+}
+
+def doc_types(active_only=True):
+    """The evidence dropdown — master data, not a constant.
+
+    Lives in `master_achiever_doc_type`, registered in `master_registry`, so
+    Admin > Masters manages it like the other 123 dropdowns. Each row carries a
+    `category` (identity | credential | supporting) and that is what the submit
+    rule keys on, which is why this needs its own table rather than a row in a
+    shared one.
+
+    Returns [] on failure rather than raising: a dropdown that cannot load
+    should not take the whole application screen down with it.
+    """
+    try:
+        return call_proc('sp_achiever_doc_types_list', 1 if active_only else 0) or []
+    except Exception as e:
+        logger.error(f"doc type list failed: {e}")
+        return []
+
+
+def doc_type_ok(value):
+    """(ok, reason) for a submitted doc_type. Distinguishes an unknown value
+    from one an admin has retired, so the message can differ."""
+    if not value:
+        return False, 'unknown'
+    try:
+        row = call_proc_one('sp_achiever_doc_type_check', value) or {}
+    except Exception as e:
+        logger.error(f"doc type check failed for {value!r}: {e}")
+        # Fail closed — an unvalidated document type must not reach the queue.
+        return False, 'unknown'
+    return bool(row.get('ok')), row.get('reason') or 'unknown'
+
+def _fill_policy_tokens(s, achiever_id=None):
+    """Substitute the commission tokens in agreement text.
+
+    The label used to read "SKOVO retains 30%" as literal text while
+    PLATFORM_FEE_RATIO lived in helpers.py. Change the commission and the
+    sentence an achiever legally accepted would still say 30%. The master row
+    carries `{commission_pct}` / `{achiever_pct}` instead, filled here from the
+    single source of truth — now `commission_rules`, so a rate change is
+    reflected in what the next achiever is asked to accept.
+
+    Passing achiever_id resolves their own rate; without it the global rule
+    applies. This deliberately raises when no rule resolves: rendering an
+    agreement with a guessed percentage would put a number in front of someone
+    to sign that the platform does not actually intend to honour.
+    """
+    if not s:
+        return s
+    from portal.helpers.helpers import resolve_commission_rate
+    pct = round(resolve_commission_rate(achiever_id=achiever_id) * 100)
+    return (s.replace('{commission_pct}', str(pct))
+             .replace('{achiever_pct}', str(100 - pct)))
+
+
+def agreement_types(required_only=False):
+    """The agreements an achiever must accept — master data, not a constant.
+
+    Lives in `master_achiever_agreement`, registered in `master_registry`, so
+    Admin > Masters edits them. Each row carries the TEXT that was accepted and
+    its version, which is what makes the consent ledger evidentiary: before
+    this, `policy_version = 'v1'` pointed at nothing.
+    """
+    try:
+        rows = call_proc('sp_achiever_agreement_types_list',
+                         1 if required_only else 0) or []
+    except Exception as e:
+        logger.error(f"agreement type list failed: {e}")
+        return []
+    for r in rows:
+        r['label'] = _fill_policy_tokens(r.get('label'))
+        r['body'] = _fill_policy_tokens(r.get('body'))
+    return rows
+
+
+def agreement_type_ok(value):
+    """(ok, reason, version) for a submitted agreement type.
+
+    Returns the CURRENT version so the route records consent against the exact
+    wording the achiever was shown, rather than a global constant.
+    """
+    if not value:
+        return False, 'unknown', None
+    try:
+        row = call_proc_one('sp_achiever_agreement_type_check', value) or {}
+    except Exception as e:
+        logger.error(f"agreement type check failed for {value!r}: {e}")
+        return False, 'unknown', None
+    return bool(row.get('ok')), row.get('reason') or 'unknown', row.get('version')
+
+
+def agreement_status(achiever_id):
+    """Every required agreement with whether this achiever accepted it, which
+    version they signed, and whether the wording has moved on since."""
+    try:
+        rows = call_proc('sp_achiever_agreement_status', achiever_id) or []
+    except Exception as e:
+        logger.error(f"agreement status failed for {achiever_id}: {e}")
+        return []
+    for r in rows:
+        r['label'] = _fill_policy_tokens(r.get('label'))
+        r['body'] = _fill_policy_tokens(r.get('body'))
+    return rows
+
+# How long a background check stays valid before the nightly job demotes it.
+BGV_VALID_MONTHS = 12
+
+
+def get_trust(achiever_id):
+    """The achiever's trust row joined with what their tier allows.
+
+    Returns None when the achiever does not exist. Every value the guards need
+    is on this one dict: trust_level, can_*, max_session_rate, bgv_status.
+    """
+    if not achiever_id:
+        return None
+    try:
+        return call_proc_one('sp_achiever_trust_get', achiever_id)
+    except Exception as e:
+        logger.error(f"trust lookup failed for {achiever_id}: {e}")
+        return None
+
+
+def has_capability(achiever_id, capability, trust=None):
+    """True when the achiever's tier grants `capability`."""
+    row = trust if trust is not None else get_trust(achiever_id)
+    if not row:
+        return False
+    # An inactive account holds no capabilities regardless of tier — banning
+    # someone must not be undone by their tier still looking good.
+    if not row.get('is_active'):
+        return False
+    return bool(row.get(capability))
+
+
+def require_capability(achiever_id, capability, trust=None):
+    """None when allowed, otherwise a ready-to-return 403 response.
+
+    Guards read as one line:  `err = require_capability(...); if err: return err`
+    """
+    row = trust if trust is not None else get_trust(achiever_id)
+    if not row:
+        return jsonify(response={'message': 'Achiever not found.'}, status=404, bool=False)
+    if not row.get('is_active'):
+        return jsonify(response={'message': 'This achiever account is inactive.'},
+                       status=403, bool=False)
+    if row.get(capability):
+        return None
+    return jsonify(
+        response={
+            'message': _DENIED.get(capability, 'Your account cannot perform this action yet.'),
+            'trust_level': row.get('trust_level'),
+            'tier_label': row.get('tier_label'),
+            'required_capability': capability,
+            'next_step': row.get('evidence_required'),
+        },
+        status=403, bool=False,
+    )
+
+
+def rate_ceiling(achiever_id, trust=None):
+    """Highest session rate this tier may set. 0 means "cannot charge"."""
+    row = trust if trust is not None else get_trust(achiever_id)
+    if not row or not row.get('can_charge'):
+        return 0.0
+    return float(row.get('max_session_rate') or 0)
+
+
+def clamp_rate(achiever_id, requested, trust=None):
+    """Clamp a requested session rate into the tier's allowance.
+
+    Returns (rate, note). `note` is None when the rate went through untouched,
+    otherwise an explanation the caller surfaces — silently rewriting someone's
+    price without telling them is how you get a support ticket.
+    """
+    try:
+        rate = float(requested or 0)
+    except (TypeError, ValueError):
+        return 0.0, 'Rate must be a number.'
+    if rate <= 0:
+        return 0.0, None
+
+    row = trust if trust is not None else get_trust(achiever_id)
+    if not row or not row.get('can_charge'):
+        return 0.0, ('Paid sessions unlock once your achievement is verified. '
+                     'Your rate has been kept at 0 for now.')
+
+    ceiling = float(row.get('max_session_rate') or 0)
+    if ceiling and rate > ceiling:
+        return ceiling, (f'Your tier allows up to ₹{ceiling:,.0f} per session. '
+                         f'Your rate was set to ₹{ceiling:,.0f}.')
+    return rate, None
+
+
+def booking_eligibility(achiever_id, student_id):
+    """Can this student book this achiever? -> (ok: bool, reason: str, state: str)
+
+    Delegates to sp_achiever_booking_eligibility so the DPDP age-band rule, the
+    parental-consent rule and the lifecycle state are evaluated together in one
+    place — three separate Python checks would drift apart the first time one
+    of them changed.
+
+    The third value used to be a trust tier and is now the lifecycle state.
+    Both call sites discard it; it is returned for logging.
+    """
+    try:
+        row = call_proc_one('sp_achiever_booking_eligibility', achiever_id, student_id) or {}
+    except Exception as e:
+        logger.error(f"booking eligibility failed a={achiever_id} s={student_id}: {e}")
+        # Fail closed. An eligibility check that errors must not become a yes.
+        return False, 'eligibility_check_failed', ''
+    return bool(row.get('ok')), row.get('reason') or 'unknown', row.get('state') or ''
+
+
+# Reason code -> what the student is told. Kept out of SQL so the wording can
+# change without a migration.
+BOOKING_DENIED = {
+    'not_found': 'Achiever not found.',
+    'inactive': 'This achiever is not currently available.',
+    'unverified': 'This achiever is not yet available for bookings.',
+    'student_under_14': 'SKOVO accounts are available from age 14.',
+    'parental_consent_pending': (
+        'We need a parent or guardian to confirm your account before you can '
+        'book a session. Check the email we sent them.'),
+    # A probation achiever runs free demo sessions only.
+    'achiever_cannot_charge': 'This achiever is running free demo sessions right now.',
+    'eligibility_check_failed': 'We could not verify this booking. Please try again.',
+}
+
+
+def booking_denied_message(reason):
+    return BOOKING_DENIED.get(reason, 'This booking is not available.')
+
+
+def trust_rules():
+    """The full tier table — used by admin UI and the achiever's own status page."""
+    try:
+        return call_proc('sp_achiever_trust_rules_list') or []
+    except Exception as e:
+        logger.error(f"trust rules read failed: {e}")
+        return []
+
+
+def public_badge(row):
+    """What a student sees on an achiever card.
+
+    Deliberately coarse: students should not be reading a tier number. The only
+    distinction that matters to them is whether this person cleared a background
+    check, because that is what governs who may mentor a minor.
+    """
+    level = int(row.get('trust_level') or 0)
+    if level >= L_BGV:
+        return 'background_verified'
+    if level >= L_CREDENTIAL:
+        return 'verified'
+    if level >= L_IDENTITY:
+        return 'identity_verified'
+    return None
+
+# ── Lifecycle capabilities ───────────────────────────────────────────────────
+# These replace the tier guards above. Capability now follows the achiever's
+# state — pending / probation / active / suspended / banned — which is the
+# model the platform actually runs on. The tier table decided this before, and
+# two systems answering the same question is how an achiever ends up able to
+# charge while still on probation.
+
+def lifecycle_caps(achiever_id):
+    """The achiever's state and what it permits, or None when not found."""
+    if not achiever_id:
+        return None
+    try:
+        return call_proc_one('sp_achiever_capabilities', achiever_id)
+    except Exception as e:
+        logger.error(f"capability lookup failed for {achiever_id}: {e}")
+        return None
+
+
+def require_state(achiever_id, capability, message):
+    """None when permitted, else a ready-to-return 403 body.
+
+    Fails closed: a lookup that errors is a refusal, never an allow.
+    """
+    from flask import jsonify
+    caps = lifecycle_caps(achiever_id)
+    if not caps:
+        return jsonify(response={'message': 'We could not verify your account status.'},
+                       status=403, bool=False)
+    if not caps.get(capability):
+        return jsonify(response={'message': message, 'state': caps.get('state')},
+                       status=403, bool=False)
+    return None

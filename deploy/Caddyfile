@@ -1,0 +1,110 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SKOVO — Caddy reverse proxy
+#
+# Caddy obtains and renews Let's Encrypt certificates automatically; there is no
+# certificate to install or rotate. Both hostnames must already resolve to this
+# EC2 instance's public IP before the container starts, or the ACME challenge
+# fails and Caddy will retry on a backoff.
+#
+# Websockets need no special handling — reverse_proxy detects the upgrade and
+# passes it through, which is what keeps the whiteboard and chat working.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+{
+	email {$ACME_EMAIL}
+
+	# Uncomment to test against Let's Encrypt staging (avoids burning the rate
+	# limit of 5 failures per account per hostname per hour while DNS settles).
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# ── API ───────────────────────────────────────────────────────────────────────
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# Health check — bypasses logging so it doesn't drown the access log.
+	handle /v1/health {
+		reverse_proxy backend:5000
+	}
+
+	handle {
+		reverse_proxy backend:5000 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+
+			# Socket.IO sessions are long-lived; the default 5s dial timeout is
+			# fine but the stream timeouts must not cut an active whiteboard.
+			transport http {
+				dial_timeout 5s
+				read_timeout 24h
+				write_timeout 24h
+			}
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# ── The web app is not served from here ───────────────────────────────
+# skovoai.com, www.skovoai.com and skovoai.info are all served by CloudFront
+# from the skovo-web S3 bucket. This box runs the backend only.
+#
+# Deploying the frontend is therefore a build and an s3 sync from a laptop -
+# it does not touch this file, this host, or Docker. See deploy/README.md.
+#
+# There used to be {$WEB_DOMAIN} and {$ADMIN_DOMAIN} blocks here proxying to an
+# nginx container holding a second copy of the same bundle. Two copies meant
+# two deploys, and they had already drifted to different chunk hashes once.
+
+
+# ── Stale-DNS bridge (temporary) ────────────────────────────────────
+# These three names now resolve to CloudFront. Resolvers that still hold the old
+# A record send users here instead - and with no site block for them, Caddy
+# refuses the TLS handshake and the site looks dead. It is not a 404 the user can
+# read past; the connection never completes.
+#
+# The old records carried a 4-hour TTL from BigRock, so this can persist well
+# after the cutover looks finished. Proxying to CloudFront keeps those users
+# served with the correct URL in their address bar until their DNS catches up.
+#
+# Remove this block once the old TTLs have expired everywhere - a day is ample.
+# Keeping it costs one extra hop for a shrinking number of users; removing it
+# too early breaks them outright.
+# www is deliberately absent: Caddy never held a certificate for it, and it
+# cannot get one now - the ACME challenge follows DNS to CloudFront, not here.
+# Leaving it in made Caddy retry every few seconds against a Let's Encrypt
+# limit of 5 failures per hostname per hour.
+skovoai.com, skovoai.info {
+	encode zstd gzip
+
+	reverse_proxy https://d3g8w5b9f6um6o.cloudfront.net {
+		header_up Host {host}
+		transport http {
+			tls
+			tls_server_name d3g8w5b9f6um6o.cloudfront.net
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+# Publicly reachable but password-protected by Grafana itself. To lock it down
+# further, add a `@office { remote_ip 1.2.3.4 }` matcher and `abort` everything
+# else.
+{$GRAFANA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy grafana:3000
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,21 @@
+{
+  "name": "skovo-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright end-to-end tests for the SKOVO platform (web + API + payment plumbing).",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test tests/01-api-health.spec.js",
+    "test:screens": "playwright test tests/03-student-screens.spec.js tests/15-portal-ui-screens.spec.js",
+    "test:v1": "playwright test tests/26-v1-quality-gate.spec.js tests/37-v1-surface-contract.spec.js",
+    "test:student": "playwright test tests/03 tests/10 tests/11 tests/14 tests/18 tests/20",
+    "test:admin": "playwright test tests/05 tests/12 tests/22",
+    "test:achiever": "playwright test tests/07 tests/13 tests/17 tests/19 tests/31 tests/32 tests/33 tests/34 tests/35 tests/36",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report report",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

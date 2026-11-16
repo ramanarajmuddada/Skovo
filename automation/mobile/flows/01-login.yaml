@@ -1,0 +1,31 @@
+# Student login → lands in the app.
+# Run:  maestro test flows/01-login.yaml
+appId: ${APP_ID}
+env:
+  EMAIL: e2e.pro@skovo-test.local
+  PASSWORD: E2ePass!234
+---
+- launchApp:
+    clearState: true
+
+# Landing screen — tap through to the sign-in form. `optional` so a flow that
+# starts already past it (runFlow from another spec) does not fail here.
+- tapOn:
+    text: "Get started"
+    optional: true
+
+
+- assertVisible: "you@email.com"
+- tapOn: "you@email.com"
+- inputText: ${EMAIL}
+
+- tapOn: "Your password"
+- inputText: ${PASSWORD}
+
+- tapOn:
+    text: "Sign in|Login|Log in"
+
+# The tab bar appears once authenticated.
+- assertVisible:
+    text: "Home"
+    timeout: 15000

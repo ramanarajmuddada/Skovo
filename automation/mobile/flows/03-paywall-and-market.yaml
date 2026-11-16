@@ -1,0 +1,48 @@
+# Free-tier gates on mobile: a Pro-only Market deal shows locked and routes to
+# the upgrade screen instead of redeeming.
+# Run:  maestro test flows/03-paywall-and-market.yaml
+appId: ${APP_ID}
+env:
+  EMAIL: e2e.free@skovo-test.local     # the FREE seeded student
+  PASSWORD: E2ePass!234
+---
+- launchApp:
+    clearState: true
+
+# Landing screen — tap through to the sign-in form. `optional` so a flow that
+# starts already past it (runFlow from another spec) does not fail here.
+- tapOn:
+    text: "Get started"
+    optional: true
+
+- tapOn: "you@email.com"
+- inputText: ${EMAIL}
+- tapOn: "Your password"
+- inputText: ${PASSWORD}
+- tapOn:
+    text: "Sign in|Login|Log in"
+- assertVisible:
+    text: "Home"
+    timeout: 15000
+
+# ── Market: the Pro-only deal is locked for a free student ────────────────
+- tapOn: "More"
+- tapOn: "Market"
+- assertVisible:
+    text: ".*Market.*"
+    timeout: 10000
+- assertVisible: "Unlock with Pro"
+
+- tapOn: "Unlock with Pro"
+# Should land on the Skovo Pro upgrade screen, not redeem the deal.
+- assertVisible:
+    text: ".*Pro.*"
+    timeout: 10000
+
+# ── Opportunities hub is score-locked for this student (score 0) ──────────
+- back
+- tapOn: "More"
+- tapOn: "Opportunities"
+- assertVisible:
+    text: ".*locked.*|.*Opportunity Hub.*"
+    timeout: 10000
