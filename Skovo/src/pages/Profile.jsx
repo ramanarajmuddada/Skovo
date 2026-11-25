@@ -65,7 +65,9 @@ export default function Profile() {
     setSkillsDetail(data.response.skills_detail || []);
     setAvatarUrl(data.response.avatar_url || '');
     setDob(data.response.date_of_birth || '');
-    setDobDraft(data.response.date_of_birth || '');
+    // A background refresh (education section saved, path status) must not throw
+    // away a date the student has picked but not saved yet.
+    if (!keepForm) setDobDraft(data.response.date_of_birth || '');
     setGender(data.response.gender || '');
     setReservation(data.response.reservation_category || '');
     if (!keepForm) {
@@ -144,7 +146,6 @@ export default function Profile() {
           return;
         }
         setDob(dobDraft);
-        setDobDraft('');
       }
 
       const { data } = await api.patch('/profile/', { ...formData, career_interests: pickedInterests });
@@ -174,7 +175,7 @@ export default function Profile() {
       : [...p.career_interests, i],
   }));
 
-  const startEdit = () => { setFieldErrs({}); setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = () => { setFieldErrs({}); setDobDraft(dob); setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const field = (key, val) => setFormData(p => ({ ...p, [key]: val }));
 
@@ -273,7 +274,7 @@ export default function Profile() {
               </Button>
             </div>
           ) : (
-            <Button variant="primary" size="md" onClick={() => { setFieldErrs({}); setEditing(true); }}>
+            <Button variant="primary" size="md" onClick={startEdit}>
               <Edit3 size={15} /> Edit Profile
             </Button>
           )

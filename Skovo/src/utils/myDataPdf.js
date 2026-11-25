@@ -20,13 +20,47 @@ function fmt(v) {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (Array.isArray(v)) return v.join(', ') || '—';
-  if (typeof v === 'object') return JSON.stringify(v);
+  if (typeof v === 'object') return plain(v);
+  if (typeof v === 'string' && /^\s*[[{]/.test(v)) {
+    try { return plain(JSON.parse(v)); } catch { /* not JSON, print as is */ }
+  }
   if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
     const d = new Date(v);
     if (!Number.isNaN(d.getTime())) return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   }
   return String(v);
 }
+
+// Nested data (lists, objects) as short readable text, empty parts dropped.
+function plain(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (Array.isArray(v)) return v.map(plain).filter(Boolean).join(', ');
+  if (typeof v === 'object') {
+    return Object.entries(v).map(([k, x]) => { const t = plain(x); return t ? `${label(k)}: ${t}` : ''; })
+      .filter(Boolean).join('; ');
+  }
+  return String(v);
+}
+
+// A stored code such as "class_10" or "polytechnic" -> "Class 10" / "Polytechnic".
+const nice = (v) => (typeof v === 'string' && /^[a-z0-9_]+$/.test(v)
+  ? v.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : v);
+
+const dateOnly = (v) => {
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) || d.getFullYear() < 1990 ? '' : d.toLocaleDateString('en-IN', { dateStyle: 'medium' });
+};
+
+// What a student wants to see about each education stage; the rest is bookkeeping.
+const STAGE_FIELDS = [
+  ['education_category', 'Education level', nice], ['sub_year', 'Year / class', nice],
+  ['board', 'Board', nice], ['stream', 'Stream', nice],
+  ['degree_category', 'Degree category', nice], ['degree_type', 'Degree', nice], ['branch', 'Branch', nice],
+  ['institute', 'Institute'], ['state', 'State'], ['status', 'Status', nice],
+  ['started_at', 'Started', dateOnly], ['ended_at', 'Ended', dateOnly],
+  ['final_score', 'Final score'], ['final_level', 'Final level', nice],
+  ['cohorts_completed', 'Cohorts completed'], ['tasks_completed', 'Tasks completed'],
+];
 
 const keep = (k) => !SKIP_COLS.has(k) && !HIDDEN.test(k);
 
@@ -68,7 +102,39 @@ export async function downloadMyDataPdf(data) {
     if (key === 'account' || key === 'exported_at' || !Array.isArray(rows)) continue;
     if (!rows.length) continue;
     section(TITLES[key] || label(key));
-    const cols = Object.keys(rows[0]).filter((c) => keep(c) && rows.some((r) => r[c] !== null && r[c] !== ''));
+    if (key === 'stages') {
+      rows.forEach((r, i) => {
+        const body = STAGE_FIELDS
+          .map(([k, name, f]) => [name, f ? f(r[k]) : r[k]])
+          .filter(([, v]) => v !== null && v !== undefined && v !== '' && v !== 0);
+        if (!body.length) return;
+        if (rows.length > 1) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+          if (y > 760) { doc.addPage(); y = 56; }
+          doc.text(`Stage ${i + 1}`, 40, y + 4); y += 8;
+        }
+        autoTable(doc, { ...base, startY: y, body: body.map(([n, v]) => [n, fmt(v)]),
+                         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 150 } } });
+        after();
+      });
+      continue;
+    }
+    const cols = Object.keys(rows[0]).filter((c) => keep(c) && rows.some((r) => fmt(r[c]) !== '—'));
+    if (cols.length > 6) {
+      // Too wide for a table page: one name/value list per record.
+      rows.forEach((r, i) => {
+        const body = cols.map((c) => [label(c), fmt(r[c])]).filter(([, v]) => v !== '—');
+        if (!body.length) return;
+        if (rows.length > 1) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+          if (y > 760) { doc.addPage(); y = 56; }
+          doc.text(`Record ${i + 1}`, 40, y + 4); y += 8;
+        }
+        autoTable(doc, { ...base, startY: y, body, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 150 } } });
+        after();
+      });
+      continue;
+    }
     if (rows.length === 1 && cols.length > 4) {
       // One record with many fields reads better as a two-column list.
       autoTable(doc, { ...base, startY: y, body: cols.map((c) => [label(c), fmt(rows[0][c])]),
