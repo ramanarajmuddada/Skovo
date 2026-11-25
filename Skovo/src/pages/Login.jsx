@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button, Input } from '../components/ui/index.jsx';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { postAuthPath } from '../utils/checkoutIntent';
+import LoginOtpStep from '../components/auth/LoginOtpStep';
 import { login as loginSchema, otpLogin as otpLoginSchema, fieldErrors } from '../schemas/student';
 
 /* Muted text colour that is readable in both light and dark mode.
@@ -12,7 +13,10 @@ import { login as loginSchema, otpLogin as otpLoginSchema, fieldErrors } from '.
 const MUTED = { color: 'rgba(148, 163, 184, 0.9)' }; // slate-400 equivalent, always readable
 
 export default function Login() {
-  const { sendOtp, loginWithPassword } = useAuth();
+  const { sendOtp, loginWithPassword, verifyLoginOtp, resendLoginOtp } = useAuth();
+  // Set once the password is accepted and a code has been emailed: the screen
+  // then asks for the code instead of the password.
+  const [challenge, setChallenge] = useState(null);
   const navigate = useNavigate();
 
   const justRegistered = useLocation().state?.registered;
@@ -41,7 +45,13 @@ export default function Login() {
     setFieldErr({});
     setLoading(true);
     try {
-      await loginWithPassword({ email: parsed.data.email.toLowerCase(), password: parsed.data.password });
+      const result = await loginWithPassword({ email: parsed.data.email.toLowerCase(), password: parsed.data.password });
+      if (result?.otpRequired) {
+        // Password accepted; a code was emailed. No session exists yet.
+        setPassword('');
+        setChallenge(result);
+        return;
+      }
       // A plan picked on the landing page survives the login detour.
       navigate(postAuthPath());
     } catch (err) {
@@ -88,6 +98,28 @@ export default function Login() {
   };
 
   const switchMode = (m) => { setMode(m); setError(''); setFieldErr({}); };
+
+  if (challenge) {
+    return (
+      <AuthLayout>
+        <LoginOtpStep
+          emailMasked={challenge.emailMasked}
+          resendIn={challenge.resendIn}
+          onVerify={async (otp) => {
+            await verifyLoginOtp({ challengeId: challenge.challengeId, otp });
+            navigate(postAuthPath());
+          }}
+          onResend={async () => {
+            const r = await resendLoginOtp({ challengeId: challenge.challengeId });
+            // The server issues a new challenge id with every code.
+            setChallenge((c) => ({ ...c, challengeId: r.challenge_id, resendIn: r.resend_in }));
+            return r;
+          }}
+          onBack={() => setChallenge(null)}
+        />
+      </AuthLayout>
+    );
+  }
 
   const fieldCls = '!text-base min-h-11';
   const eyeBtn = 'relative p-2 -m-1 hover:opacity-100 transition-opacity before:absolute before:-inset-2 before:content-[\'\']';

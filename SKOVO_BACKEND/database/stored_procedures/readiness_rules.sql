@@ -15,12 +15,14 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS `sp_readiness_rules_create`$$
 
+-- Four arguments, matching what portal/routes/Admin/admin_readiness_rules.py
+-- calls and what migrate_rules_autopause_and_cleanup.py installs. This file used
+-- to carry the old eight-argument version (it wrote cohort_pts_* / task_pts_*
+-- columns the table no longer has). apply_all loads this file on every run, so
+-- the stale copy kept reinstalling itself over the good one and the first
+-- Readiness Rules screen visit failed with "Incorrect number of arguments".
 CREATE PROCEDURE `sp_readiness_rules_create`(
     IN p_id CHAR(36),
-    IN p_cohort_pts_each INT,
-    IN p_cohort_pts_max INT,
-    IN p_task_pts_each INT,
-    IN p_task_pts_max INT,
     IN p_opportunity_unlock_score INT,
     IN p_created_by CHAR(36),
     IN p_updated_by CHAR(36)
@@ -28,10 +30,8 @@ CREATE PROCEDURE `sp_readiness_rules_create`(
 BEGIN
     IF p_id IS NULL OR p_id = '' THEN SET p_id = UUID(); END IF;
     INSERT INTO `readiness_rules`
-        (`id`, `cohort_pts_each`, `cohort_pts_max`, `task_pts_each`, `task_pts_max`,
-         `opportunity_unlock_score`, `created_by`, `updated_by`)
-    VALUES (p_id, p_cohort_pts_each, p_cohort_pts_max, p_task_pts_each, p_task_pts_max,
-            p_opportunity_unlock_score, p_created_by, p_updated_by);
+        (`id`, `opportunity_unlock_score`, `created_by`, `updated_by`)
+    VALUES (p_id, p_opportunity_unlock_score, p_created_by, p_updated_by);
     SELECT * FROM `readiness_rules` WHERE `id` = p_id;
 END$$
 

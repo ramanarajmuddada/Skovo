@@ -112,7 +112,7 @@ class AchieverReferralSend(Resource):
                 from portal.helpers.email_template import send_email, simple_email_body
                 ref_name = me.get('full_name') or 'An achiever'
                 from portal.helpers.achiever_notify import achiever_url
-                # Students sign up on the student site; achievers register on the achiever portal (skovoai.info).
+                # Students sign up on the student site; achievers register on the achiever portal (also skovoai.com).
                 base = (os.environ.get('FRONTEND_URL') or 'https://skovoai.com').rstrip('/')
                 stable = achiever_code(achiever_id)
                 if audience == 'achiever':

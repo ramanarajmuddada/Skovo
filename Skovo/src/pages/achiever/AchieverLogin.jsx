@@ -5,8 +5,31 @@ import { saveAchieverToken, API_BASE_URL } from '../../services/api';
 import AchieverAuthLayout from '../../components/layout/AchieverAuthLayout';
 import * as schema from '../../schemas/achiever';
 import { fieldErrors } from '../../schemas/achiever';
+import LoginOtpStep from '../../components/auth/LoginOtpStep';
 
 const MUTED = { color: 'rgba(148, 163, 184, 0.9)' };
+
+// POST to the achiever API and return the parsed envelope. A failure carries the
+// server's own wording (and retry_after) so the code screen can show it as is.
+async function achieverPost(path, body) {
+  let data;
+  try {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    data = await res.json();
+  } catch {
+    throw new Error('Network error. Please try again.');
+  }
+  if (!data.bool) {
+    const err = new Error(data.response?.message || 'Request failed.');
+    err.retryAfter = data.response?.retry_after;
+    throw err;
+  }
+  return data;
+}
 
 export default function AchieverLogin() {
   const navigate = useNavigate();
@@ -16,12 +39,20 @@ export default function AchieverLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState('');
   const [errors, setErrors] = useState({});
+  // Set once the password is accepted and a code has been emailed.
+  const [challenge, setChallenge] = useState(null);
   const emailRef = useRef(null);
   const pwRef    = useRef(null);
 
   const sf = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     if (errors[k]) setErrors(e => ({ ...e, [k]: undefined }));
+  };
+
+  const finishLogin = (data) => {
+    saveAchieverToken(data.access_token);
+    localStorage.setItem('achiever_user', JSON.stringify(data.response));
+    navigate('/skovo-achiever-portal');
   };
 
   const handleSubmit = async (e) => {
@@ -37,18 +68,18 @@ export default function AchieverLogin() {
     setErrors({});
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/achiever/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email.trim().toLowerCase(), password: form.password }),
-      });
-      const data = await res.json();
-      if (!data.bool) { setError(data.response?.message || 'Login failed.'); return; }
-      saveAchieverToken(data.access_token);
-      localStorage.setItem('achiever_user', JSON.stringify(data.response));
-      navigate('/skovo-achiever-portal');
-    } catch {
-      setError('Network error. Please try again.');
+      const data = await achieverPost('/achiever/login',
+        { email: form.email.trim().toLowerCase(), password: form.password });
+      if (data.response?.otp_required) {
+        // Password accepted; a code was emailed. No session exists yet.
+        const r = data.response;
+        sf('password', '');
+        setChallenge({ challengeId: r.challenge_id, emailMasked: r.email_masked, resendIn: r.resend_in });
+        return;
+      }
+      finishLogin(data);
+    } catch (err) {
+      setError(err.message || 'Login failed.');
     } finally {
       setLoading(false);
     }
@@ -56,6 +87,28 @@ export default function AchieverLogin() {
 
   // min-h-11: py-2.5 lands at 42px, two short of the 44px touch minimum.
   const inputCls = 'w-full min-h-11 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-shadow';
+
+  if (challenge) {
+    return (
+      <AchieverAuthLayout>
+        <LoginOtpStep
+          emailMasked={challenge.emailMasked}
+          resendIn={challenge.resendIn}
+          onVerify={async (otp) => {
+            const data = await achieverPost('/achiever/login/verify', { challenge_id: challenge.challengeId, otp });
+            finishLogin(data);
+          }}
+          onResend={async () => {
+            const data = await achieverPost('/achiever/login/resend', { challenge_id: challenge.challengeId });
+            // The server issues a new challenge id with every code.
+            setChallenge((c) => ({ ...c, challengeId: data.response.challenge_id, resendIn: data.response.resend_in }));
+            return data.response;
+          }}
+          onBack={() => setChallenge(null)}
+        />
+      </AchieverAuthLayout>
+    );
+  }
 
   return (
     <AchieverAuthLayout>

@@ -198,19 +198,28 @@ def main():
         # Carry existing achievers across. trust_level 0 was 'applied' and
         # invisible; anything higher was already listed and charging, so those
         # people keep working rather than being knocked back into probation.
-        moved = conn.execute(text("""
-            UPDATE `achievers`
-               SET state = CASE
-                       WHEN IFNULL(is_active, 0) = 0 THEN 'suspended'
-                       WHEN IFNULL(trust_level, 0) = 0 THEN 'pending'
-                       ELSE 'active'
-                   END,
-                   state_changed_at = UTC_TIMESTAMP(),
-                   state_reason = 'Migrated from trust_level'
-             WHERE state = 'pending'
-               AND state_changed_at IS NULL
-        """)).rowcount
-        print(f"  existing achievers migrated to states: {moved}")
+        #
+        # Only when the old column is still there. A database built from today's
+        # models never had `trust_level`, and has no pre-lifecycle achievers to
+        # carry across -- reading the missing column used to abort the whole
+        # migration here and roll back the required-document flags set above, so
+        # a fresh install showed achievers an empty "Documents you need" list.
+        if _has_column(conn, 'achievers', 'trust_level'):
+            moved = conn.execute(text("""
+                UPDATE `achievers`
+                   SET state = CASE
+                           WHEN IFNULL(is_active, 0) = 0 THEN 'suspended'
+                           WHEN IFNULL(trust_level, 0) = 0 THEN 'pending'
+                           ELSE 'active'
+                       END,
+                       state_changed_at = UTC_TIMESTAMP(),
+                       state_reason = 'Migrated from trust_level'
+                 WHERE state = 'pending'
+                   AND state_changed_at IS NULL
+            """)).rowcount
+            print(f"  existing achievers migrated to states: {moved}")
+        else:
+            print("  no trust_level column (fresh schema): nothing to carry across")
 
         # Anyone already holding bank details keeps the ability to withdraw.
         ready = conn.execute(text("""

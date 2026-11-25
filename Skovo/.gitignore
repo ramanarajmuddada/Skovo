@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# per-site build outputs (npm run build:web / build:admin)
+dist-web
+dist-admin

@@ -56,9 +56,9 @@ def achiever_url(path=VERIFICATION_PATH):
     client, and a dead button is worse than a paragraph telling them where to
     go — the text of every message says that anyway.
     """
-    # The achiever portal lives on the admin domain (skovoai.info), not the
-    # student site in FRONTEND_URL — a skovoai.com link here is a 404.
-    base = (os.environ.get('ACHIEVER_PORTAL_URL') or 'https://skovoai.info').rstrip('/')
+    # The achiever portal is served by the web build on skovoai.com (the admin
+    # build on skovoai.info has no achiever routes — a link there is a 404).
+    base = (os.environ.get('ACHIEVER_PORTAL_URL') or 'https://skovoai.com').rstrip('/')
     if not path.startswith(PORTAL_PATH):
         path = PORTAL_PATH + (path if path.startswith('/') else '/' + path)
     return f"{base}{path}" if base else None

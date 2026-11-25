@@ -60,10 +60,35 @@ export function AuthProvider({ children }) {
     return _applyAuth(data);
   };
 
+  // Step 1 of sign-in. The server checks the password and emails a code; it does
+  // NOT return a session. The caller gets { otpRequired: true, ... } and must
+  // finish with verifyLoginOtp(). (If the server has the second step switched
+  // off it returns the session directly, and that is applied as before.)
   const loginWithPassword = async ({ email, password }) => {
     const { data } = await api.post('/auth/login', { email, password });
     if (!data.bool) throw new Error(data.response?.message || 'Login failed');
+    if (data.response?.otp_required) {
+      const r = data.response;
+      return { otpRequired: true, challengeId: r.challenge_id, emailMasked: r.email_masked, resendIn: r.resend_in };
+    }
     return _applyAuth(data);
+  };
+
+  // Step 2: the emailed code. Only a correct, unexpired, unused code returns tokens.
+  const verifyLoginOtp = async ({ challengeId, otp }) => {
+    const { data } = await api.post('/auth/login/verify', { challenge_id: challengeId, otp });
+    if (!data.bool) throw new Error(data.response?.message || 'Verification failed');
+    return _applyAuth(data);
+  };
+
+  const resendLoginOtp = async ({ challengeId }) => {
+    const { data } = await api.post('/auth/login/resend', { challenge_id: challengeId });
+    if (!data.bool) {
+      const err = new Error(data.response?.message || 'Could not resend the code.');
+      err.retryAfter = data.response?.retry_after;
+      throw err;
+    }
+    return data.response;
   };
 
   const adminLogin = async ({ email, password }) => {
@@ -112,7 +137,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, sendOtp, verifyOtp, registerWithPassword, loginWithPassword, adminLogin, adminSendOtp, adminRegister, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, sendOtp, verifyOtp, registerWithPassword, loginWithPassword, verifyLoginOtp, resendLoginOtp, adminLogin, adminSendOtp, adminRegister, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

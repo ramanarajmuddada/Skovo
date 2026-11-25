@@ -5,180 +5,191 @@ import { ToastProvider } from './components/ui/index.jsx';
 import { useAuth } from './context/AuthContext';
 import { isAdminHost } from './utils/portalHost';
 
+/* ── Two builds from one source ────────────────────────────────────────
+   VITE_PORTAL picks what goes in the bundle:
+     'web'   -> skovoai.com  : students, achievers and public pages
+     'admin' -> skovoai.info : the staff console, admin and super-admin portals
+     unset   -> everything (local dev, where both sites share localhost)
+   Vite inlines the value at build time, so the other side's routes and their
+   lazy chunks are dropped from the output rather than merely hidden. */
+const PORTAL    = import.meta.env.VITE_PORTAL; // literal at build time, so dead branches fold away
+const SHOW_WEB   = PORTAL !== 'admin';
+const SHOW_ADMIN = PORTAL !== 'web';
+
 /* ── Lazy page imports ────────────────────────────────────────────────── */
 
 // Public
-const LandingPage   = lazy(() => import('./pages/LandingPage'));
-const Login         = lazy(() => import('./pages/Login'));
-const SignUp        = lazy(() => import('./pages/SignUp'));
-const VerifyEmail   = lazy(() => import('./pages/VerifyEmail'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const AcceptInvite  = lazy(() => import('./pages/AcceptInvite'));
-const NotFound      = lazy(() => import('./pages/NotFound'));
-const ConsentGate   = lazy(() => import('./pages/ConsentGate'));
-const ParentConsent = lazy(() => import('./pages/ParentConsent'));
+const LandingPage   = /* @__PURE__ */ lazy(() => import('./pages/LandingPage'));
+const Login         = /* @__PURE__ */ lazy(() => import('./pages/Login'));
+const SignUp        = /* @__PURE__ */ lazy(() => import('./pages/SignUp'));
+const VerifyEmail   = /* @__PURE__ */ lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = /* @__PURE__ */ lazy(() => import('./pages/ForgotPassword'));
+const AcceptInvite  = /* @__PURE__ */ lazy(() => import('./pages/AcceptInvite'));
+const NotFound      = /* @__PURE__ */ lazy(() => import('./pages/NotFound'));
+const ConsentGate   = /* @__PURE__ */ lazy(() => import('./pages/ConsentGate'));
+const ParentConsent = /* @__PURE__ */ lazy(() => import('./pages/ParentConsent'));
 
 // Legal / policy pages — public, reachable signed-out. Cashfree and AWS SES
 // both fetch these during review, so they must resolve without a session.
-const Terms   = lazy(() => import('./pages/legal/Terms'));
-const Privacy = lazy(() => import('./pages/legal/Privacy'));
-const Refund  = lazy(() => import('./pages/legal/Refund'));
-const Contact = lazy(() => import('./pages/legal/Contact'));
-const PricingPage = lazy(() => import('./pages/legal/Pricing'));
+const Terms   = /* @__PURE__ */ lazy(() => import('./pages/legal/Terms'));
+const Privacy = /* @__PURE__ */ lazy(() => import('./pages/legal/Privacy'));
+const Refund  = /* @__PURE__ */ lazy(() => import('./pages/legal/Refund'));
+const Contact = /* @__PURE__ */ lazy(() => import('./pages/legal/Contact'));
+const PricingPage = /* @__PURE__ */ lazy(() => import('./pages/legal/Pricing'));
 
 // Student app
-const MainLayout              = lazy(() => import('./components/layout/MainLayout'));
-const Dashboard               = lazy(() => import('./pages/Dashboard'));
-const BhaAI                   = lazy(() => import('./pages/BhaAI'));
-const Cohorts                 = lazy(() => import('./pages/Cohorts'));
-const OneOnOnes               = lazy(() => import('./pages/OneOnOnes'));
-const Colleges                = lazy(() => import('./pages/Colleges'));
-const SavedColleges           = lazy(() => import('./pages/SavedColleges'));
-const CollegePredictor        = lazy(() => import('./pages/CollegePredictor'));
-const CollegeDetails          = lazy(() => import('./pages/CollegeDetails'));
-const Opportunities           = lazy(() => import('./pages/Opportunities'));
-const Applications            = lazy(() => import('./pages/Applications'));
-const Assemble                = lazy(() => import('./pages/Assemble'));
-const Coaching                = lazy(() => import('./pages/Coaching'));
-const Profile                 = lazy(() => import('./pages/Profile'));
-const FindMentors             = lazy(() => import('./pages/FindMentors'));
-const AchieverPublicProfile   = lazy(() => import('./pages/AchieverPublicProfile'));
-// v1-hidden: const ReadinessAssessment     = lazy(() => import('./pages/ReadinessAssessment'));
-const Bookings                = lazy(() => import('./pages/Bookings'));
-const PaymentHistory          = lazy(() => import('./pages/PaymentHistory'));
-const SkovoPro                = lazy(() => import('./pages/SkovoPro'));
-const Tasks                   = lazy(() => import('./pages/Tasks'));
-const Notifications           = lazy(() => import('./pages/Notifications'));
-const HelpSupport             = lazy(() => import('./pages/HelpSupport'));
-const Roadmap                 = lazy(() => import('./pages/Roadmap'));
-const CGHub                   = lazy(() => import('./pages/CGHub'));
-const CGEntranceExams         = lazy(() => import('./pages/CGEntranceExams'));
-const CGScholarships          = lazy(() => import('./pages/CGScholarships'));
-const CGGovtExams             = lazy(() => import('./pages/CGGovtExams'));
-const CGAbroad                = lazy(() => import('./pages/CGAbroad'));
-const CGBranches              = lazy(() => import('./pages/CGBranches'));
-const MockTests               = lazy(() => import('./pages/MockTests'));
-const CollegeApplicationTracker = lazy(() => import('./pages/CollegeApplicationTracker'));
-const Forum                   = lazy(() => import('./pages/Forum'));
-const ScholarshipTracker      = lazy(() => import('./pages/ScholarshipTracker'));
-const ResumeBuilder           = lazy(() => import('./pages/ResumeBuilder'));
-const ExamResources           = lazy(() => import('./pages/ExamResources'));
-const DocumentVault           = lazy(() => import('./pages/DocumentVault'));
-const Market                  = lazy(() => import('./pages/Market'));
-const ScoreEngine             = lazy(() => import('./pages/ScoreEngine'));
-const SOPBuilder              = lazy(() => import('./pages/SOPBuilder'));
-const Certifications          = lazy(() => import('./pages/Certifications'));
-const Leaderboard             = lazy(() => import('./pages/Leaderboard'));
-const StreakPage              = lazy(() => import('./pages/v1/Streak'));
-const Practice                = lazy(() => import('./pages/v1/Practice'));
-const WalletPage              = lazy(() => import('./pages/v1/Wallet'));
-const ParentView              = lazy(() => import('./pages/v1/ParentView'));
-const Referrals               = lazy(() => import('./pages/Referrals'));
+const MainLayout              = /* @__PURE__ */ lazy(() => import('./components/layout/MainLayout'));
+const Dashboard               = /* @__PURE__ */ lazy(() => import('./pages/Dashboard'));
+const BhaAI                   = /* @__PURE__ */ lazy(() => import('./pages/BhaAI'));
+const Cohorts                 = /* @__PURE__ */ lazy(() => import('./pages/Cohorts'));
+const OneOnOnes               = /* @__PURE__ */ lazy(() => import('./pages/OneOnOnes'));
+const Colleges                = /* @__PURE__ */ lazy(() => import('./pages/Colleges'));
+const SavedColleges           = /* @__PURE__ */ lazy(() => import('./pages/SavedColleges'));
+const CollegePredictor        = /* @__PURE__ */ lazy(() => import('./pages/CollegePredictor'));
+const CollegeDetails          = /* @__PURE__ */ lazy(() => import('./pages/CollegeDetails'));
+const Opportunities           = /* @__PURE__ */ lazy(() => import('./pages/Opportunities'));
+const Applications            = /* @__PURE__ */ lazy(() => import('./pages/Applications'));
+const Assemble                = /* @__PURE__ */ lazy(() => import('./pages/Assemble'));
+const Coaching                = /* @__PURE__ */ lazy(() => import('./pages/Coaching'));
+const Profile                 = /* @__PURE__ */ lazy(() => import('./pages/Profile'));
+const FindMentors             = /* @__PURE__ */ lazy(() => import('./pages/FindMentors'));
+const AchieverPublicProfile   = /* @__PURE__ */ lazy(() => import('./pages/AchieverPublicProfile'));
+// v1-hidden: const ReadinessAssessment     = /* @__PURE__ */ lazy(() => import('./pages/ReadinessAssessment'));
+const Bookings                = /* @__PURE__ */ lazy(() => import('./pages/Bookings'));
+const PaymentHistory          = /* @__PURE__ */ lazy(() => import('./pages/PaymentHistory'));
+const SkovoPro                = /* @__PURE__ */ lazy(() => import('./pages/SkovoPro'));
+const Tasks                   = /* @__PURE__ */ lazy(() => import('./pages/Tasks'));
+const Notifications           = /* @__PURE__ */ lazy(() => import('./pages/Notifications'));
+const HelpSupport             = /* @__PURE__ */ lazy(() => import('./pages/HelpSupport'));
+const Roadmap                 = /* @__PURE__ */ lazy(() => import('./pages/Roadmap'));
+const CGHub                   = /* @__PURE__ */ lazy(() => import('./pages/CGHub'));
+const CGEntranceExams         = /* @__PURE__ */ lazy(() => import('./pages/CGEntranceExams'));
+const CGScholarships          = /* @__PURE__ */ lazy(() => import('./pages/CGScholarships'));
+const CGGovtExams             = /* @__PURE__ */ lazy(() => import('./pages/CGGovtExams'));
+const CGAbroad                = /* @__PURE__ */ lazy(() => import('./pages/CGAbroad'));
+const CGBranches              = /* @__PURE__ */ lazy(() => import('./pages/CGBranches'));
+const MockTests               = /* @__PURE__ */ lazy(() => import('./pages/MockTests'));
+const CollegeApplicationTracker = /* @__PURE__ */ lazy(() => import('./pages/CollegeApplicationTracker'));
+const Forum                   = /* @__PURE__ */ lazy(() => import('./pages/Forum'));
+const ScholarshipTracker      = /* @__PURE__ */ lazy(() => import('./pages/ScholarshipTracker'));
+const ResumeBuilder           = /* @__PURE__ */ lazy(() => import('./pages/ResumeBuilder'));
+const ExamResources           = /* @__PURE__ */ lazy(() => import('./pages/ExamResources'));
+const DocumentVault           = /* @__PURE__ */ lazy(() => import('./pages/DocumentVault'));
+const Market                  = /* @__PURE__ */ lazy(() => import('./pages/Market'));
+const ScoreEngine             = /* @__PURE__ */ lazy(() => import('./pages/ScoreEngine'));
+const SOPBuilder              = /* @__PURE__ */ lazy(() => import('./pages/SOPBuilder'));
+const Certifications          = /* @__PURE__ */ lazy(() => import('./pages/Certifications'));
+const Leaderboard             = /* @__PURE__ */ lazy(() => import('./pages/Leaderboard'));
+const StreakPage              = /* @__PURE__ */ lazy(() => import('./pages/v1/Streak'));
+const Practice                = /* @__PURE__ */ lazy(() => import('./pages/v1/Practice'));
+const WalletPage              = /* @__PURE__ */ lazy(() => import('./pages/v1/Wallet'));
+const ParentView              = /* @__PURE__ */ lazy(() => import('./pages/v1/ParentView'));
+const Referrals               = /* @__PURE__ */ lazy(() => import('./pages/Referrals'));
 
 // Admin portal
 import ConsoleLanding from './components/layout/ConsoleLanding';
-const AdminLogin          = lazy(() => import('./pages/admin/AdminLogin'));
-const AdminLayout         = lazy(() => import('./pages/admin/AdminLayout'));
-const AdminDashboard      = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminUsers          = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminStudentDetail  = lazy(() => import('./pages/admin/AdminStudentDetail'));
-const AdminCohorts        = lazy(() => import('./pages/admin/AdminCohorts'));
-const AdminColleges       = lazy(() => import('./pages/admin/AdminColleges'));
-const AdminOpportunities  = lazy(() => import('./pages/admin/AdminOpportunities'));
-const AdminAchievers      = lazy(() => import('./pages/admin/AdminAchievers'));
-const AdminAchieverLifecycle = lazy(() => import('./pages/admin/AdminAchieverLifecycle'));
-const AdminDomains        = lazy(() => import('./pages/admin/AdminDomains'));
-const AdminMasters        = lazy(() => import('./pages/admin/AdminMasters'));
-const AdminCities         = lazy(() => import('./pages/admin/AdminCities'));
-const AdminCourseCatalogue = lazy(() => import('./pages/admin/AdminCourseCatalogue'));
-const AdminImport         = lazy(() => import('./pages/admin/AdminImport'));
-const AdminCoaching       = lazy(() => import('./pages/admin/AdminCoaching'));
-const AdminInvites        = lazy(() => import('./pages/admin/AdminInvites'));
-const AdminAudit          = lazy(() => import('./pages/admin/AdminAudit'));
-const AdminBookings       = lazy(() => import('./pages/admin/AdminBookings'));
-const AdminPayments       = lazy(() => import('./pages/admin/AdminPayments'));
-const AdminTasks          = lazy(() => import('./pages/admin/AdminTasks'));
-const AdminReadinessRules = lazy(() => import('./pages/admin/AdminReadinessRules'));
-const AdminProfile        = lazy(() => import('./pages/admin/AdminProfile'));
-const AdminAnalytics      = lazy(() => import('./pages/admin/AdminAnalytics'));
-const AdminCGColleges     = lazy(() => import('./pages/admin/AdminCGColleges'));
-const AdminCGEntranceExams = lazy(() => import('./pages/admin/AdminCGEntranceExams'));
-const AdminCGScholarships  = lazy(() => import('./pages/admin/AdminCGScholarships'));
-const AdminCGGovtExams     = lazy(() => import('./pages/admin/AdminCGGovtExams'));
-const AdminCGAbroad        = lazy(() => import('./pages/admin/AdminCGAbroad'));
-const AdminCGBranches      = lazy(() => import('./pages/admin/AdminCGBranches'));
-const AdminCGRankData      = lazy(() => import('./pages/admin/AdminCGRankData'));
-const AdminCGContent       = lazy(() => import('./pages/admin/AdminCGContent'));
-const AdminCGAIPrompts     = lazy(() => import('./pages/admin/AdminCGAIPrompts'));
-const AdminErrorLogs       = lazy(() => import('./pages/admin/AdminErrorLogs'));
-const AdminMockTests          = lazy(() => import('./pages/admin/AdminMockTests'));
-const AdminExamResources      = lazy(() => import('./pages/admin/AdminExamResources'));
-const AdminCourses            = lazy(() => import('./pages/admin/AdminCourses'));
-const AdminCommunities        = lazy(() => import('./pages/admin/AdminCommunities'));
-const AdminCollegeReviews     = lazy(() => import('./pages/admin/AdminCollegeReviews'));
-const AdminReferrals          = lazy(() => import('./pages/admin/AdminReferrals'));
-const AdminCoupons            = lazy(() => import('./pages/admin/AdminCoupons'));
-const AdminSubscriptions      = lazy(() => import('./pages/admin/AdminSubscriptions'));
-const AdminMarket             = lazy(() => import('./pages/admin/AdminMarket'));
-const AdminScoreRules         = lazy(() => import('./pages/admin/AdminScoreRules'));
-const AdminModeration         = lazy(() => import('./pages/admin/AdminModeration'));
-const AdminSupport            = lazy(() => import('./pages/admin/AdminSupport'));
+const AdminLogin          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminLogin'));
+const AdminLayout         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminLayout'));
+const AdminDashboard      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminUsers'));
+const AdminStudentDetail  = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminStudentDetail'));
+const AdminCohorts        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCohorts'));
+const AdminColleges       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminColleges'));
+const AdminOpportunities  = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminOpportunities'));
+const AdminAchievers      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAchievers'));
+const AdminAchieverLifecycle = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAchieverLifecycle'));
+const AdminDomains        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminDomains'));
+const AdminMasters        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminMasters'));
+const AdminCities         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCities'));
+const AdminCourseCatalogue = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCourseCatalogue'));
+const AdminImport         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminImport'));
+const AdminCoaching       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCoaching'));
+const AdminInvites        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminInvites'));
+const AdminAudit          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAudit'));
+const AdminBookings       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminBookings'));
+const AdminPayments       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminPayments'));
+const AdminTasks          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminTasks'));
+const AdminReadinessRules = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminReadinessRules'));
+const AdminProfile        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminProfile'));
+const AdminAnalytics      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminCGColleges     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGColleges'));
+const AdminCGEntranceExams = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGEntranceExams'));
+const AdminCGScholarships  = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGScholarships'));
+const AdminCGGovtExams     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGGovtExams'));
+const AdminCGAbroad        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGAbroad'));
+const AdminCGBranches      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGBranches'));
+const AdminCGRankData      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGRankData'));
+const AdminCGContent       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGContent'));
+const AdminCGAIPrompts     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGAIPrompts'));
+const AdminErrorLogs       = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminErrorLogs'));
+const AdminMockTests          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminMockTests'));
+const AdminExamResources      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminExamResources'));
+const AdminCourses            = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCourses'));
+const AdminCommunities        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCommunities'));
+const AdminCollegeReviews     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCollegeReviews'));
+const AdminReferrals          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminReferrals'));
+const AdminCoupons            = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCoupons'));
+const AdminSubscriptions      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminSubscriptions'));
+const AdminMarket             = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminMarket'));
+const AdminScoreRules         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminScoreRules'));
+const AdminModeration         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminModeration'));
+const AdminSupport            = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminSupport'));
 // Version 1 (feature-updates.md)
-const AdminStages          = lazy(() => import('./pages/admin/AdminStages'));
-const AdminStreaks         = lazy(() => import('./pages/admin/AdminStreaks'));
-const AdminAchieverGuidelines = lazy(() => import('./pages/admin/AdminAchieverGuidelines'));
-const AdminReadinessV21    = lazy(() => import('./pages/admin/AdminReadinessV21'));
-const AdminLeaderboard     = lazy(() => import('./pages/admin/AdminLeaderboard'));
-const AdminEngagement      = lazy(() => import('./pages/admin/AdminEngagement'));
-const AdminWallet          = lazy(() => import('./pages/admin/AdminWallet'));
-const AdminCommunitySafety = lazy(() => import('./pages/admin/AdminCommunitySafety'));
-const AdminPlatformV1      = lazy(() => import('./pages/admin/AdminPlatformV1'));
+const AdminStages          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminStages'));
+const AdminStreaks         = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminStreaks'));
+const AdminAchieverGuidelines = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAchieverGuidelines'));
+const AdminReadinessV21    = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminReadinessV21'));
+const AdminLeaderboard     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminLeaderboard'));
+const AdminEngagement      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminEngagement'));
+const AdminWallet          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminWallet'));
+const AdminCommunitySafety = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCommunitySafety'));
+const AdminPlatformV1      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminPlatformV1'));
 
 // Super admin portal
-const SuperLogin          = lazy(() => import('./pages/super/SuperLogin'));
-const SuperLayout         = lazy(() => import('./pages/super/SuperLayout'));
-const SuperDashboard      = lazy(() => import('./pages/super/SuperDashboard'));
-const SuperAdmins         = lazy(() => import('./pages/super/SuperAdmins'));
-const SuperBusinessDashboard = lazy(() => import('./pages/super/SuperBusinessDashboard'));
-const SuperAdminApprovals    = lazy(() => import('./pages/super/SuperAdminApprovals'));
-const SuperUsers          = lazy(() => import('./pages/super/SuperUsers'));
-const SuperMentors        = lazy(() => import('./pages/super/SuperMentors'));
-const SuperCohorts        = lazy(() => import('./pages/super/SuperCohorts'));
-const SuperAuditLog       = lazy(() => import('./pages/super/SuperAuditLog'));
-const SuperOpportunities  = lazy(() => import('./pages/super/SuperOpportunities'));
-const SuperCommunities    = lazy(() => import('./pages/super/SuperCommunities'));
-const SuperCourses        = lazy(() => import('./pages/super/SuperCourses'));
-const SuperEnrollments    = lazy(() => import('./pages/super/SuperEnrollments'));
-const SuperReadiness      = lazy(() => import('./pages/super/SuperReadiness'));
-const SuperV1Overview   = lazy(() => import('./pages/super/SuperV1Overview'));
-const SuperProfile        = lazy(() => import('./pages/super/SuperProfile'));
+const SuperLogin          = /* @__PURE__ */ lazy(() => import('./pages/super/SuperLogin'));
+const SuperLayout         = /* @__PURE__ */ lazy(() => import('./pages/super/SuperLayout'));
+const SuperDashboard      = /* @__PURE__ */ lazy(() => import('./pages/super/SuperDashboard'));
+const SuperAdmins         = /* @__PURE__ */ lazy(() => import('./pages/super/SuperAdmins'));
+const SuperBusinessDashboard = /* @__PURE__ */ lazy(() => import('./pages/super/SuperBusinessDashboard'));
+const SuperAdminApprovals    = /* @__PURE__ */ lazy(() => import('./pages/super/SuperAdminApprovals'));
+const SuperUsers          = /* @__PURE__ */ lazy(() => import('./pages/super/SuperUsers'));
+const SuperMentors        = /* @__PURE__ */ lazy(() => import('./pages/super/SuperMentors'));
+const SuperCohorts        = /* @__PURE__ */ lazy(() => import('./pages/super/SuperCohorts'));
+const SuperAuditLog       = /* @__PURE__ */ lazy(() => import('./pages/super/SuperAuditLog'));
+const SuperOpportunities  = /* @__PURE__ */ lazy(() => import('./pages/super/SuperOpportunities'));
+const SuperCommunities    = /* @__PURE__ */ lazy(() => import('./pages/super/SuperCommunities'));
+const SuperCourses        = /* @__PURE__ */ lazy(() => import('./pages/super/SuperCourses'));
+const SuperEnrollments    = /* @__PURE__ */ lazy(() => import('./pages/super/SuperEnrollments'));
+const SuperReadiness      = /* @__PURE__ */ lazy(() => import('./pages/super/SuperReadiness'));
+const SuperV1Overview   = /* @__PURE__ */ lazy(() => import('./pages/super/SuperV1Overview'));
+const SuperProfile        = /* @__PURE__ */ lazy(() => import('./pages/super/SuperProfile'));
 
 // Achiever portal
-const AchieverLogin          = lazy(() => import('./pages/achiever/AchieverLogin'));
-const AchieverRegister       = lazy(() => import('./pages/achiever/AchieverRegister'));
-const AchieverVerifyOTP      = lazy(() => import('./pages/achiever/AchieverVerifyOTP'));
-const AchieverForgotPassword = lazy(() => import('./pages/achiever/AchieverForgotPassword'));
-const AchieverLayout       = lazy(() => import('./pages/achiever/AchieverLayout'));
-const AchieverDashboard    = lazy(() => import('./pages/achiever/AchieverDashboard'));
-const AchieverBookings     = lazy(() => import('./pages/achiever/AchieverBookings'));
-const AchieverCohorts      = lazy(() => import('./pages/achiever/AchieverCohorts'));
-const AchieverTasks       = lazy(() => import('./pages/achiever/AchieverTasks'));
-const AchieverReviewQueue  = lazy(() => import('./pages/achiever/AchieverReviewQueue'));
-const AchieverAvailability = lazy(() => import('./pages/achiever/AchieverAvailability'));
-const AchieverEarnings     = lazy(() => import('./pages/achiever/AchieverEarnings'));
-const AchieverReferrals    = lazy(() => import('./pages/achiever/AchieverReferrals'));
-const AchieverProfile      = lazy(() => import('./pages/achiever/AchieverProfile'));
-const AchieverApplication  = lazy(() => import('./pages/achiever/AchieverApplication'));
-const AchieverNotifications = lazy(() => import('./pages/achiever/AchieverNotifications'));
-// const AchieverDomains      = lazy(() => import('./pages/achiever/AchieverDomains'));  // v1: hidden
+const AchieverLogin          = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverLogin'));
+const AchieverRegister       = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverRegister'));
+const AchieverVerifyOTP      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverVerifyOTP'));
+const AchieverForgotPassword = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverForgotPassword'));
+const AchieverLayout       = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverLayout'));
+const AchieverDashboard    = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverDashboard'));
+const AchieverBookings     = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverBookings'));
+const AchieverCohorts      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverCohorts'));
+const AchieverTasks       = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverTasks'));
+const AchieverReviewQueue  = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverReviewQueue'));
+const AchieverAvailability = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverAvailability'));
+const AchieverEarnings     = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverEarnings'));
+const AchieverReferrals    = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverReferrals'));
+const AchieverProfile      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverProfile'));
+const AchieverApplication  = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverApplication'));
+const AchieverNotifications = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverNotifications'));
+// const AchieverDomains      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverDomains'));  // v1: hidden
 // v1-hidden: achiever courses
-// const AchieverCourses      = lazy(() => import('./pages/achiever/AchieverCourses'));
+// const AchieverCourses      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverCourses'));
 // v1: no coupon codes; Offers replaces the Coupons screen.
-const AchieverOffers       = lazy(() => import('./pages/achiever/AchieverOffers'));
-const AchieverHelpSupport  = lazy(() => import('./pages/achiever/AchieverHelpSupport'));
+const AchieverOffers       = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverOffers'));
+const AchieverHelpSupport  = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverHelpSupport'));
 
 // v1-hidden: student courses
-// v1-hidden: const Courses              = lazy(() => import('./pages/Courses'));
+// v1-hidden: const Courses              = /* @__PURE__ */ lazy(() => import('./pages/Courses'));
 
 /* ── Loading fallback ─────────────────────────────────────────────────── */
 function PageLoader() {
@@ -198,14 +209,20 @@ function PageLoader() {
   );
 }
 
-/* Old achiever emails linked to skovoai.com/achiever/<page>. Send them to the
-   same page in the achiever portal on the admin domain. */
+/* Old achiever emails linked to skovoai.com/achiever/<page>. The achiever portal
+   now lives on this same (web) site, so send them straight to the same page. */
 function OldAchieverLink() {
   const rest = window.location.pathname.replace(/^\/achiever\/?/, '');
+  return <Navigate to={`/skovo-achiever-portal/${rest}${window.location.search}`} replace />;
+}
+
+/* On the web site the staff-portal paths belong to the admin domain. Anyone who
+   follows an old link or types one here is sent across, path and query intact. */
+function ToAdminSite() {
   const host = (import.meta.env.VITE_ADMIN_HOST || '').trim();
-  const path = `/skovo-achiever-portal/${rest}${window.location.search}`;
-  if (host && window.location.hostname !== host) { window.location.replace(`https://${host}${path}`); return null; }
-  return <Navigate to={path} replace />;
+  const { pathname, search } = window.location;
+  if (host) { window.location.replace(`https://${host}${pathname}${search}`); return <PageLoader />; }
+  return <NotFound />;
 }
 
 /* ── Route guards ─────────────────────────────────────────────────────── */
@@ -216,7 +233,7 @@ function HomeRoute() {
   // root is the admin console's landing page — never the student one, and never
   // the student dashboard redirect, since a student session in this browser
   // says nothing about who is standing at the admin door.
-  if (isAdminHost()) return <ConsoleLanding />;
+  if (PORTAL === 'admin' || (PORTAL !== 'web' && isAdminHost())) return <ConsoleLanding />;
 
   return user ? <Navigate to="/career-path" replace /> : <LandingPage />;
 }
@@ -303,6 +320,7 @@ function App() {
         <Routes>
           {/* Landing page — public, redirects to app if authenticated */}
           <Route path="/" element={<HomeRoute />} />
+          {SHOW_WEB && (<>
 
           {/* Invite acceptance — public */}
           <Route path="/invite/:token" element={<AcceptInvite />} />
@@ -383,6 +401,44 @@ function App() {
             <Route path="/referrals"                     element={<Referrals />} />
           </Route>
 
+          {/* ── Achiever portal ──────────────────────────────── */}
+          <Route path="/achiever/*" element={<OldAchieverLink />} />
+          <Route path="/skovo-achiever-portal/login"            element={<AchieverLogin />} />
+          <Route path="/skovo-achiever-portal/register"         element={<AchieverRegister />} />
+          <Route path="/skovo-achiever-portal/verify-otp"       element={<AchieverVerifyOTP />} />
+          <Route path="/skovo-achiever-portal/forgot-password"  element={<AchieverForgotPassword />} />
+          <Route
+            path="/skovo-achiever-portal"
+            element={<AchieverRoute><AchieverLayout /></AchieverRoute>}
+          >
+            <Route index element={<AchieverDashboard />} />
+            <Route path="bookings"     element={<AchieverBookings />} />
+            <Route path="cohorts"      element={<AchieverCohorts />} />
+            <Route path="tasks"        element={<AchieverTasks />} />
+            <Route path="review-queue" element={<AchieverReviewQueue />} />
+            <Route path="availability" element={<AchieverAvailability />} />
+            <Route path="earnings"     element={<AchieverEarnings />} />
+            {/* v1: Domains screen hidden; domains are picked in Create cohort.
+            <Route path="domains"      element={<AchieverDomains />} /> */}
+            {/* v1-hidden: <Route path="courses"      element={<AchieverCourses />} /> */}
+            <Route path="offers"       element={<AchieverOffers />} />
+            <Route path="coupons"      element={<Navigate to="/skovo-achiever-portal/offers" replace />} />
+            <Route path="profile"      element={<AchieverProfile />} />
+            <Route path="application"  element={<AchieverApplication />} />
+            <Route path="notifications" element={<AchieverNotifications />} />
+            <Route path="support"       element={<AchieverHelpSupport />} />
+            <Route path="referrals"     element={<AchieverReferrals />} />
+          </Route>
+
+          {PORTAL === 'web' && (<>
+          {/* Staff-portal paths on the web site go to the admin domain. */}
+          <Route path="/console" element={<ToAdminSite />} />
+          <Route path="/skovo-platform-panel-admin/*" element={<ToAdminSite />} />
+          <Route path="/skovo-platform-owner/*" element={<ToAdminSite />} />
+          </>)}
+          </>)}
+
+          {SHOW_ADMIN && (<>
           {/* ── Admin portal ─────────────────────────────────── */}
           {/* Landing — public. Also what the admin domain's root renders (see
               HomeRoute); the explicit path keeps it reachable in dev, where
@@ -492,34 +548,7 @@ function App() {
             <Route path="profile"     element={<SuperProfile />} />
           </Route>
 
-          {/* ── Achiever portal ──────────────────────────────── */}
-          <Route path="/achiever/*" element={<OldAchieverLink />} />
-          <Route path="/skovo-achiever-portal/login"            element={<AchieverLogin />} />
-          <Route path="/skovo-achiever-portal/register"         element={<AchieverRegister />} />
-          <Route path="/skovo-achiever-portal/verify-otp"       element={<AchieverVerifyOTP />} />
-          <Route path="/skovo-achiever-portal/forgot-password"  element={<AchieverForgotPassword />} />
-          <Route
-            path="/skovo-achiever-portal"
-            element={<AchieverRoute><AchieverLayout /></AchieverRoute>}
-          >
-            <Route index element={<AchieverDashboard />} />
-            <Route path="bookings"     element={<AchieverBookings />} />
-            <Route path="cohorts"      element={<AchieverCohorts />} />
-            <Route path="tasks"        element={<AchieverTasks />} />
-            <Route path="review-queue" element={<AchieverReviewQueue />} />
-            <Route path="availability" element={<AchieverAvailability />} />
-            <Route path="earnings"     element={<AchieverEarnings />} />
-            {/* v1: Domains screen hidden; domains are picked in Create cohort.
-            <Route path="domains"      element={<AchieverDomains />} /> */}
-            {/* v1-hidden: <Route path="courses"      element={<AchieverCourses />} /> */}
-            <Route path="offers"       element={<AchieverOffers />} />
-            <Route path="coupons"      element={<Navigate to="/skovo-achiever-portal/offers" replace />} />
-            <Route path="profile"      element={<AchieverProfile />} />
-            <Route path="application"  element={<AchieverApplication />} />
-            <Route path="notifications" element={<AchieverNotifications />} />
-            <Route path="support"       element={<AchieverHelpSupport />} />
-            <Route path="referrals"     element={<AchieverReferrals />} />
-          </Route>
+          </>)}
 
           <Route path="*" element={<NotFound />} />
         </Routes>

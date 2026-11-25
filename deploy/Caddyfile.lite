@@ -1,0 +1,26 @@
+# Backend API only. The web app is served by CloudFront from S3.
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	handle /v1/health {
+		reverse_proxy backend:5000
+	}
+	handle {
+		reverse_proxy backend:5000 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				dial_timeout 5s
+				read_timeout 24h
+				write_timeout 24h
+			}
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

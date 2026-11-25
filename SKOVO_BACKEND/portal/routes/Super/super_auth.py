@@ -10,6 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from portal.models import db
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.helpers.rate_limit import limiter
+from portal.helpers.platform_admins import is_allowed_super_admin_email
 from portal.helpers.email_template import send_otp_email
 from portal.helpers.helpers import generate_otp
 from . import ns, logger
@@ -51,7 +52,7 @@ class SuperLogin(Resource):
             # scan the bounded batch this returns. ─────────────────────────────
             all_supers = call_proc('sp_super_admins_list', 5000, 0)
             sa = next((s for s in all_supers if (s.get('email') or '').lower() == email and s.get('status') == 'active'), None)
-            if not sa or not check_password_hash(sa['password_hash'], password):
+            if not is_allowed_super_admin_email(email) or not sa or not check_password_hash(sa['password_hash'], password):
                 return jsonify(response={'message': 'Invalid credentials.'}, status=401, bool=False)
 
             token = create_access_token(

@@ -1,0 +1,67 @@
+# Low-cost single-host override: MySQL in a container instead of RDS, and no
+# Prometheus/Loki/Grafana. Use with docker-compose.prod.yml:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.lite.yml --env-file .env.prod \
+#       up -d caddy backend scheduler redis mysql
+volumes:
+  mysql_data:
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: skovo_mysql
+    restart: unless-stopped
+    command: >
+      --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=256M --max-connections=80 --performance-schema=OFF
+      --skip-log-bin --log-bin-trust-function-creators=1
+      --lock-wait-timeout=30
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: skovo
+      MYSQL_USER: skovo
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+    # Loopback only: reachable from the server itself (AWS Session Manager tunnel),
+    # never from the internet. Do NOT change to "3306:3306".
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks: [skovo_net]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  caddy:
+    depends_on: !override [backend]
+    volumes:
+      - ./Caddyfile.lite:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backend:
+    environment:
+      ZEPTOMAIL_TOKEN: ${ZEPTOMAIL_TOKEN:-}
+      ZEPTOMAIL_API_URL: ${ZEPTOMAIL_API_URL:-https://api.zeptomail.in/v1.1/email}
+      LOGIN_OTP_REQUIRED: ${LOGIN_OTP_REQUIRED:-0}
+    depends_on: !override
+      redis: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+
+  scheduler:
+    # The image's health check probes port 5000; the scheduler serves nothing there.
+    healthcheck:
+      disable: true
+    environment:
+      ZEPTOMAIL_TOKEN: ${ZEPTOMAIL_TOKEN:-}
+      ZEPTOMAIL_API_URL: ${ZEPTOMAIL_API_URL:-https://api.zeptomail.in/v1.1/email}
+      LOGIN_OTP_REQUIRED: ${LOGIN_OTP_REQUIRED:-0}
+    depends_on: !override
+      redis: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+
+  migrate:
+    depends_on: !override
+      mysql: { condition: service_healthy }

@@ -19,8 +19,8 @@ list_parser.add_argument('per_page', type=int, location='args', default=20)
 create_parser = reqparse.RequestParser()
 create_parser.add_argument('email', type=str, location='json', required=True, help='Email is required.')
 create_parser.add_argument('role_code', type=str, location='json', required=True,
-                           choices=('mentor', 'admin'),
-                           help='role_code must be mentor or admin.')
+                           choices=('mentor',),
+                           help='role_code must be mentor. Admin accounts cannot be created by invitation.')
 create_parser.add_argument('message', type=str, location='json', required=False)
 
 def _compute_status(invite):

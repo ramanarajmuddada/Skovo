@@ -1374,3 +1374,15 @@ html.dark .nav-pill-off { color: #cbd5e1; }
 html.dark .nav-pill-off:hover { color: #ffffff; background: rgba(255,255,255,.06); }
 .nav-sheet { background: #ffffff; }
 html.dark .nav-sheet { background: #0b1120; }
+
+/* iOS Safari zooms the whole page in when a form field with text under 16px gets
+   focus, and does not zoom back out. Several screens (achiever sign-in and
+   sign-up were 14px) set their own smaller size, so this applies to every text
+   field on touch devices. Pointer-fine devices (desktop) keep the designed size. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

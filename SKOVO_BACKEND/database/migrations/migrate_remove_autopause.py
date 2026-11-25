@@ -102,11 +102,22 @@ def main():
                 print(f"  readiness_rules.{col} already gone")
         db.session.commit()
 
-        kept = db.session.execute(text(
-            "SELECT COUNT(*) FROM score_pause_tokens WHERE is_auto = 1")).scalar()
-        freed = db.session.execute(text(
-            "SELECT COUNT(DISTINCT user_id) FROM score_pause_tokens "
-            "WHERE is_auto = 1 AND YEAR(starts_at) = YEAR(UTC_TIMESTAMP())")).scalar()
+        # The summary below counts rows flagged by the retired `is_auto` column. A
+        # database built from today's schema never had that column, so there is
+        # nothing to count -- querying it used to abort the migration after all
+        # of its real work was already saved, leaving a spurious failure.
+        has_is_auto = db.session.execute(text(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'score_pause_tokens' "
+            "AND COLUMN_NAME = 'is_auto'")).scalar()
+        if has_is_auto:
+            kept = db.session.execute(text(
+                "SELECT COUNT(*) FROM score_pause_tokens WHERE is_auto = 1")).scalar()
+            freed = db.session.execute(text(
+                "SELECT COUNT(DISTINCT user_id) FROM score_pause_tokens "
+                "WHERE is_auto = 1 AND YEAR(starts_at) = YEAR(UTC_TIMESTAMP())")).scalar()
+        else:
+            kept = freed = 0
         cols = db.session.execute(text(
             "SELECT COLUMN_NAME FROM information_schema.COLUMNS "
             "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'readiness_rules' "

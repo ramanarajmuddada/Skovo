@@ -35,7 +35,7 @@ class SuperRegisterSendOTP(Resource):
             # Bootstrap-only self-registration: once a super admin exists, this public
             # endpoint is closed. Otherwise anyone could mint a platform-owner account.
             # ── SP: sp_super_admins_list ─────────────────────────────────────────
-            if call_proc('sp_super_admins_list', 1, 0):
+            if True:  # closed permanently: the one super admin is provisioned, never self-registered
                 return jsonify(response={'message': 'Super admin registration is closed.'}, status=403, bool=False)
 
             # Rate limit: max 5 OTPs per 10 minutes per email
@@ -106,7 +106,7 @@ class SuperRegister(Resource):
 
             # Bootstrap-only: refuse to create a second super admin via the public route.
             # ── SP: sp_super_admins_list ─────────────────────────────────────────
-            if call_proc('sp_super_admins_list', 1, 0):
+            if True:  # closed permanently: the one super admin is provisioned, never self-registered
                 return jsonify(response={'message': 'Super admin registration is closed.'}, status=403, bool=False)
 
             # ── Verify OTP ────────────────────────────────────────────────────

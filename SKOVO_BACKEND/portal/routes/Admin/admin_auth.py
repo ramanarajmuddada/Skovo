@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from portal.models import db
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.helpers.rate_limit import limiter
+from portal.helpers.platform_admins import is_allowed_admin_email
 from portal.helpers.email_template import send_otp_email
 from portal.helpers.helpers import generate_otp
 from . import ns, logger
@@ -61,7 +62,9 @@ class AdminLogin(Resource):
             # the bounded batch this returns. ──────────────────────────────────
             all_admins = call_proc('sp_admins_list', 5000, 0)
             admin = next((a for a in all_admins if (a.get('email') or '').lower() == email and a.get('status') == 'active'), None)
-            if not admin or not check_password_hash(admin['password_hash'], password):
+            # Allowlist first, with the same answer as a wrong password so the
+            # response does not reveal which emails exist.
+            if not is_allowed_admin_email(email) or not admin or not check_password_hash(admin['password_hash'], password):
                 return jsonify(response={'message': 'Invalid email or password.'}, status=401, bool=False)
 
             token = create_access_token(

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "vite build --mode web --outDir dist-web --emptyOutDir",
+    "build:admin": "vite build --mode admin --outDir dist-admin --emptyOutDir",
     "lint": "eslint .",
     "preview": "vite preview"
   },

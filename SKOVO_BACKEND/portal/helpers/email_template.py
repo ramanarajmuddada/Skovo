@@ -42,8 +42,10 @@ def send_email(to: str, subject: str, html_body: str, attachments=None,
     """Send an email through the best configured provider.
 
     Provider priority:
-      1. SendGrid  (SENDGRID_API_KEY)  — recommended for deliverability at scale
-      2. SMTP      (MAILSERVER_*)      — Gmail OR Amazon SES SMTP credentials
+      1. Zoho ZeptoMail (ZEPTOMAIL_TOKEN) — transactional API; one common sender,
+                                            noreply@skovoai.com, for every OTP
+      2. SendGrid  (SENDGRID_API_KEY)  — recommended for deliverability at scale
+      3. SMTP      (MAILSERVER_*)      — ZeptoMail/Gmail/Amazon SES SMTP credentials
     Falls through gracefully; returns False (never raises) so callers stay safe.
 
     `text_body` is optional and defaults to a stripped version of the HTML.
@@ -54,11 +56,59 @@ def send_email(to: str, subject: str, html_body: str, attachments=None,
     than an empty message.
     """
     text_body = text_body or html_to_text(html_body)
+    if os.environ.get('ZEPTOMAIL_TOKEN'):
+        if _send_via_zeptomail(to, subject, html_body, attachments, text_body):
+            return True
+        # fall through to the next provider if ZeptoMail failed
     if os.environ.get('SENDGRID_API_KEY'):
         if _send_via_sendgrid(to, subject, html_body, attachments, text_body):
             return True
         # fall through to SMTP if SendGrid failed
     return _send_via_smtp(to, subject, html_body, attachments, text_body)
+
+
+def _send_via_zeptomail(to, subject, html_body, attachments=None, text_body=None) -> bool:
+    """Zoho ZeptoMail HTTP API.
+
+    ZEPTOMAIL_TOKEN is the mail agent's "Send Mail token" (with or without its
+    `Zoho-enczapikey ` prefix). ZEPTOMAIL_API_URL defaults to the India data
+    centre, which matches the zoho.in MX records on skovoai.com. Every message
+    goes out from the one common sender, MAIL_FROM_EMAIL (noreply@skovoai.com).
+    """
+    try:
+        import requests
+        token = os.environ['ZEPTOMAIL_TOKEN'].strip()
+        if not token.lower().startswith('zoho-enczapikey'):
+            token = f'Zoho-enczapikey {token}'
+        url     = os.environ.get('ZEPTOMAIL_API_URL', 'https://api.zeptomail.in/v1.1/email')
+        from_em = os.environ.get('MAIL_FROM_EMAIL') or 'noreply@skovoai.com'
+        from_nm = os.environ.get('MAIL_SENDER_NAME', 'SKOVO Team')
+        payload = {
+            'from': {'address': from_em, 'name': from_nm},
+            'to': [{'email_address': {'address': to}}],
+            'subject': subject,
+            'htmlbody': html_body,
+        }
+        if text_body:
+            payload['textbody'] = text_body
+        if attachments:
+            payload['attachments'] = [{
+                'content': base64.b64encode(
+                    a['content'].encode() if isinstance(a['content'], str) else a['content']
+                ).decode(),
+                'mime_type': a.get('mimetype', 'application/octet-stream'),
+                'name': a['filename'],
+            } for a in attachments]
+        r = requests.post(url, json=payload, timeout=15, headers={
+            'Authorization': token, 'Accept': 'application/json', 'Content-Type': 'application/json'})
+        if r.status_code in (200, 201, 202):
+            logger.info(f"Email sent via ZeptoMail to {to}")
+            return True
+        logger.error(f"ZeptoMail send failed ({r.status_code}): {r.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"ZeptoMail error: {e}")
+        return False
 
 
 def _send_via_sendgrid(to, subject, html_body, attachments=None, text_body=None) -> bool:

@@ -86,9 +86,60 @@ def _install_admin_approval_gate(app):
         return None
 
 
+# ── Only the two provisioned staff accounts may hold an admin/super token ─────
+def _install_platform_admin_allowlist(app):
+    """Re-validate every admin or super-admin token against the allowlist.
+
+    The login endpoints already refuse other emails, but a token is valid for
+    24 hours and an account row can be added by other means (database access, a
+    future route, an old token). So the check is made per request: the token's
+    identity must resolve to an *active* row whose email is on the allowlist for
+    that role, or the request is refused before any route runs. Student and
+    achiever tokens carry neither claim and pass straight through.
+    """
+    from flask import request, jsonify
+    from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
+    from sqlalchemy import text
+    from portal.models import db
+    from portal.helpers.platform_admins import (
+        is_allowed_admin_email, is_allowed_super_admin_email)
+
+    @app.before_request
+    def _enforce_platform_admins():
+        if request.method == 'OPTIONS':
+            return None
+        try:
+            verify_jwt_in_request(optional=True)
+            claims = get_jwt()
+            identity = get_jwt_identity()
+        except Exception:
+            return None            # no/invalid token: the route's own decorator answers
+        if not identity or not claims:
+            return None
+
+        role = claims.get('role')
+        is_super = bool(claims.get('super_admin')) or role == 'super_admin'
+        is_admin = bool(claims.get('admin')) or role == 'admin'
+        if not (is_super or is_admin):
+            return None
+
+        table, allowed = (('super_admins', is_allowed_super_admin_email) if is_super
+                          else ('admins', is_allowed_admin_email))
+        row = db.session.execute(
+            text(f"SELECT email, status FROM {table} WHERE id = :i"), {'i': identity}
+        ).fetchone()
+        if row is None or row[1] != 'active' or not allowed(row[0]):
+            return jsonify(
+                response={'message': 'This account is not permitted to use the admin consoles.'},
+                status=403, bool=False,
+            ), 403
+        return None
+
+
 def init_app(app):
     app.register_blueprint(api_bp)
     _install_admin_approval_gate(app)
+    _install_platform_admin_allowlist(app)
 
     @api.errorhandler(HTTPException)
     def handle_http_exception_with_cors(error):
