@@ -274,7 +274,13 @@ function xhrUpload(endpoint, formData, { token, onProgress, signal, timeout = 12
       resolve({ data, status: xhr.status, ok: xhr.status >= 200 && xhr.status < 300 });
     };
 
-    xhr.onerror   = () => reject(new Error('Could not reach the server. Check your connection and try again.'));
+    // `network: true` lets the file picker retry once. The wording no longer
+    // blames the server: this fires for any request the browser could not send,
+    // including a chosen file it can no longer read.
+    xhr.onerror   = () => reject(Object.assign(
+      new Error('Could not send the file. Check your connection and try again. '
+              + 'If it keeps failing, choose the file again or take a fresh photo.'),
+      { network: true }));
     xhr.ontimeout = () => reject(new Error('The upload timed out. On a slow connection, try a smaller file.'));
     xhr.onabort   = () => reject(Object.assign(new Error('Upload cancelled.'), { cancelled: true }));
 

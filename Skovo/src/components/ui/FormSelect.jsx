@@ -150,10 +150,7 @@ export default function FormSelect({
    * Measured here rather than in an effect because the geometry is known at the
    * click, and an effect would be a setState-in-effect render cascade.
    */
-  function toggleOpen() {
-    if (disabled) return;
-    if (open) { setOpen(false); setQuery(''); setFocused(-1); return; }
-
+  function place() {
     const r = wrapRef.current?.getBoundingClientRect();
     if (r) {
       // What the menu will ask for, capped by its own max-h-60 plus the search
@@ -173,6 +170,27 @@ export default function FormSelect({
         ? { left, width, bottom: window.innerHeight - r.top + 6, maxHeight: above - 14 }
         : { left, width, top: r.bottom + 6, maxHeight: below - 14 });
     }
+  }
+
+  // Always the latest `place`, so the resize/scroll listener below (registered
+  // once per open) re-measures with current options rather than a stale closure.
+  const placeRef = useRef(null);
+  useEffect(() => { placeRef.current = place; });
+
+  const isTouch = () => !!window.matchMedia?.('(pointer: coarse)').matches;
+
+  function toggleOpen() {
+    if (disabled) return;
+    if (open) { setOpen(false); setQuery(''); setFocused(-1); return; }
+
+    // On a phone, a field in the lower half would leave its menu (and the search
+    // box inside it) behind the on-screen keyboard, which cannot be scrolled out
+    // of the way because the menu is fixed. Bring the field up first.
+    if (isTouch()) {
+      const r0 = wrapRef.current?.getBoundingClientRect();
+      if (r0 && r0.top > window.innerHeight * 0.4) window.scrollBy({ top: r0.top - 96 });
+    }
+    place();
     setOpen(true);
   }
 
@@ -204,26 +222,46 @@ export default function FormSelect({
   // The arrow-key cursor made it worse, since scrollIntoView on the focused
   // option fires a scroll event too -- so keyboard users lost the menu on the
   // first ArrowDown that moved the list.
+  //
+  // On a phone the on-screen keyboard is the other thing that fires both events:
+  // it resizes the window and the browser scrolls the page to keep the focused
+  // box in view. Closing on those killed the menu the instant the keyboard came
+  // up -- and with it the keyboard -- so Gender and the calendar's year list
+  // could not be used. The menu now FOLLOWS its field instead (re-measured), and
+  // closes on scroll only when the field has genuinely scrolled out of sight and
+  // nobody is typing in it.
   useEffect(() => {
     if (!open) return undefined;
-    const close = (e) => {
+    const follow = (e) => {
       const t = e?.target;
       if (t && t.nodeType === 1 && menuRef.current?.contains(t)) return;
-      setOpen(false); setQuery(''); setFocused(-1);
+      const a = document.activeElement;
+      const typing = !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')
+        && (menuRef.current?.contains(a) || wrapRef.current?.contains(a));
+      if (e?.type === 'scroll' && !typing) {
+        const r = wrapRef.current?.getBoundingClientRect();
+        if (!r || r.bottom < 0 || r.top > window.innerHeight) {
+          setOpen(false); setQuery(''); setFocused(-1);
+          return;
+        }
+      }
+      placeRef.current?.();
     };
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    window.addEventListener('scroll', follow, true);
+    window.addEventListener('resize', follow);
     return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', follow, true);
+      window.removeEventListener('resize', follow);
     };
   }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
     // Focus the search box only when there is one, so arrow keys work straight
-    // away on short lists.
-    const t = setTimeout(() => { if (withSearch) inputRef.current?.focus(); }, 40);
+    // away on short lists -- but not on a touch screen. There, focusing it raised
+    // the keyboard the moment the menu opened, even for a three-item list like
+    // Gender, covering the options. A tap on the search box brings it up on demand.
+    const t = setTimeout(() => { if (withSearch && !isTouch()) inputRef.current?.focus(); }, 40);
     return () => clearTimeout(t);
   }, [open, withSearch]);
 

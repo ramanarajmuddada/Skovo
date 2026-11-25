@@ -44,11 +44,31 @@ export default function FilePicker({
   // unmounted component, and keep pushing bytes nobody is waiting for.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const choose = useCallback(picked => {
+  const choose = useCallback(async picked => {
     if (!picked) return;
     const problem = validateFile(picked);
     if (problem) { setError(problem); setFile(null); return; }
-    setError(''); setProgress(0); setFile(picked);
+
+    // Copy the bytes into memory NOW. A file chosen on a phone is only a handle to
+    // wherever the system keeps it -- a gallery cache, a cloud copy that has not
+    // finished downloading, a temporary camera file. That handle can go stale
+    // between choosing and tapping Upload (the app was in the background, the
+    // permission lapsed, the file was cleaned up), and the browser then fails the
+    // request before sending a byte -- which looked exactly like "could not reach
+    // the server" on a connection that was fine. Reading it here either proves
+    // the file is usable for the rest of the session or says so straight away.
+    let snap;
+    try {
+      const buf = await picked.arrayBuffer();
+      if (!buf.byteLength) throw new Error('empty');
+      snap = new File([buf], picked.name, { type: picked.type, lastModified: picked.lastModified });
+    } catch {
+      setFile(null);
+      setError("We couldn't read that file from your phone. If it is in Google Photos or Drive, "
+             + 'download it first, or choose it again from your gallery or take a fresh photo.');
+      return;
+    }
+    setError(''); setProgress(0); setFile(snap);
   }, []);
 
   const onDrop = useCallback(e => {
@@ -66,7 +86,18 @@ export default function FilePicker({
     abortRef.current = controller;
     setBusy(true); setError(''); setProgress(0);
     try {
-      await onUpload(file, { onProgress: setProgress, signal: controller.signal });
+      // One quiet retry on a dropped connection. Mobile networks drop a request
+      // mid-body far more often than they refuse it, and the file is held in
+      // memory, so trying again costs the person nothing. Rejections the server
+      // actually made (wrong type, too large) are never retried.
+      try {
+        await onUpload(file, { onProgress: setProgress, signal: controller.signal });
+      } catch (first) {
+        if (!first?.network || controller.signal.aborted) throw first;
+        setProgress(0);
+        await new Promise(r => setTimeout(r, 1200));
+        await onUpload(file, { onProgress: setProgress, signal: controller.signal });
+      }
       clear();
     } catch (err) {
       // The file stays selected on failure — retrying should not mean hunting

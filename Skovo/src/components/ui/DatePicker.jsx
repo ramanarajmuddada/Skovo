@@ -50,11 +50,39 @@ export default function DatePicker({
   // Follow the value when the parent changes it (reset, load-from-server…).
   // Adjusted during render rather than in an effect: React re-runs this pass
   // before committing, so the box never paints the stale date.
+  //
+  // But NOT when the change is this component's own typing echoed back. Typing a
+  // partial date into a box that already held a full one hands the parent '' (no
+  // valid date yet), and that echo used to reset the box to empty on the very
+  // next render -- so correcting one digit of an existing birth date erased
+  // everything you had typed. `emitted` remembers what we last sent up.
   const [lastValue, setLastValue] = useState(value);
+  const [emitted, setEmitted] = useState(value);
   if (value !== lastValue) {
     setLastValue(value);
-    setText(isoToDisplay(value));
+    if (value !== emitted) setText(isoToDisplay(value));
   }
+
+  // Where the calendar sits, from the field's current position. Called on open
+  // and again whenever the window resizes or scrolls while it is open.
+  const place = () => {
+    // Flip upwards when there isn't room for the panel below the field.
+    const r = wrapRef.current?.getBoundingClientRect();
+    if (r) {
+      const below = window.innerHeight - r.bottom, above = r.top;
+      const up = below < 430 && above > below;   // calendar is ~420px tall
+      const width = Math.min(304, window.innerWidth - 16);
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+      // Always a top edge, clamped so the whole panel stays on screen. On a short
+      // phone with no room either side, it covers the field rather than getting cut.
+      const H = 420, vh = window.innerHeight;
+      const want = up ? r.top - 8 - H : r.bottom + 8;
+      setBox({ left, top: Math.max(8, Math.min(want, vh - H - 8)) });
+    }
+  };
+  // Always the latest `place`, for the resize/scroll listener registered below.
+  const placeRef = useRef(null);
+  useEffect(() => { placeRef.current = place; });
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -64,10 +92,22 @@ export default function DatePicker({
           || e.target.closest?.('.field-menu')) return;
       setOpen(false);
     };
-    // The field can scroll away under a fixed calendar: close rather than float loose.
+    // The calendar is fixed, so it has to follow its field. A phone's keyboard
+    // fires both events too (it resizes the window and scrolls the page to keep
+    // the focused box in view), and closing on them shut the calendar -- and the
+    // keyboard with it -- as soon as the month/year search was tapped. So it is
+    // re-measured instead, and only closes when the field has genuinely scrolled
+    // out of sight with nobody typing.
     const onScroll = (e) => {
       if (calRef.current?.contains(e.target) || e.target.closest?.('.field-menu')) return;
-      setOpen(false);
+      const a = document.activeElement;
+      const typing = !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')
+        && (wrapRef.current?.contains(a) || calRef.current?.contains(a) || a.closest?.('.field-menu'));
+      if (e.type === 'scroll' && !typing) {
+        const r = wrapRef.current?.getBoundingClientRect();
+        if (!r || r.bottom < 0 || r.top > window.innerHeight) { setOpen(false); return; }
+      }
+      placeRef.current?.();
     };
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll);
@@ -97,24 +137,13 @@ export default function DatePicker({
     if (!open) {
       const d = openingDate();
       setView({ y: d.getFullYear(), m: d.getMonth() });
-      // Flip upwards when there isn't room for the panel below the field.
-      const r = wrapRef.current?.getBoundingClientRect();
-      if (r) {
-        const below = window.innerHeight - r.bottom, above = r.top;
-        const up = below < 430 && above > below;   // calendar is ~420px tall
-        const width = Math.min(304, window.innerWidth - 16);
-        const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-        // Always a top edge, clamped so the whole panel stays on screen. On a short
-        // phone with no room either side, it covers the field rather than getting cut.
-        const H = 420, vh = window.innerHeight;
-        const want = up ? r.top - 8 - H : r.bottom + 8;
-        setBox({ left, top: Math.max(8, Math.min(want, vh - H - 8)) });
-      }
+      place();
     }
     setOpen(o => !o);
   };
 
   const commit = (iso) => {
+    setEmitted(iso);
     onChange?.(iso);
     setText(isoToDisplay(iso));
     setOpen(false);
@@ -132,8 +161,10 @@ export default function DatePicker({
     if (iso && inRange(parseIso(iso).getTime())) {
       const d = parseIso(iso);
       setView({ y: d.getFullYear(), m: d.getMonth() });
+      setEmitted(iso);
       onChange?.(iso);
     } else if (value) {
+      setEmitted('');
       onChange?.('');          // partial or impossible date — no value to hand upstream
     }
   };
