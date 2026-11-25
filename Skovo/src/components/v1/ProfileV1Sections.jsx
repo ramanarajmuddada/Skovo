@@ -97,13 +97,18 @@ export function DataRights() {
   const [needWallet, setNeedWallet] = useState('');
   */
 
+  const [busy, setBusy] = useState(false);
   const download = async () => {
-    const { data } = await api.get('/profile/my-data');
-    if (!data?.bool) { toast.error('Could not prepare your data.'); return; }
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data.response, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = 'skovo-my-data.json'; a.click();
-    URL.revokeObjectURL(url);
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data } = await api.get('/profile/my-data');
+      if (!data?.bool) { toast.error('Could not prepare your data.'); return; }
+      const { downloadMyDataPdf } = await import('../../utils/myDataPdf');
+      await downloadMyDataPdf(data.response);
+    } catch {
+      toast.error('Could not prepare your data. Please try again.');
+    } finally { setBusy(false); }
   };
 
   /*
@@ -119,7 +124,7 @@ export function DataRights() {
     <div className="bg-white border border-slate-200 rounded-2xl p-5 mt-4 space-y-3">
       <h3 className="text-sm font-bold text-slate-900">My data</h3>
       <div className="flex flex-wrap gap-2">
-        <button onClick={download} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border text-sm"><Download size={14} /> Download my data</button>
+        <button onClick={download} disabled={busy} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border text-sm disabled:opacity-60"><Download size={14} /> {busy ? 'Preparing…' : 'Download my data (PDF)'}</button>
         {/* v1: hidden.
         <button onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-red-200 text-red-700 text-sm"><Trash2 size={14} /> Delete my account</button>
         */}

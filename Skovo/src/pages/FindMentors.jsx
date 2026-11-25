@@ -137,6 +137,14 @@ function MentorCard({ mentor, onBook }) {
   );
 }
 
+function dayLabel(iso, dt) {
+  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  const diff = Math.round((dt - t0) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return dt.toLocaleDateString('en-IN', { weekday: 'short' });
+}
+
 function fmt(t) {
   if (!t) return '';
   const [h, m] = t.split(':');
@@ -410,7 +418,8 @@ export function BookModal({ mentor, onClose, onBooked, initialOffering }) {
                 <div className="flex items-center gap-2 py-3 text-sm text-slate-400"><Loader2 size={14} className="animate-spin" /> Finding free times…</div>
               ) : days.length === 0 ? (
                 <p className="text-xs text-slate-400 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
-                  No free times in the next 4 weeks. Try another 1-on-1 or check back later.
+                  No open times for this 1-on-1 in the next 4 weeks. It may be fully booked, or the achiever has only
+                  offered specific dates. Try another 1-on-1 or check back later.
                 </p>
               ) : (
                 <>
@@ -422,21 +431,37 @@ export function BookModal({ mentor, onClose, onBooked, initialOffering }) {
                         <button key={d.date} type="button" onClick={() => { setDay(d.date); setTime(''); }}
                                 className={`shrink-0 min-w-14 min-h-14 px-2 rounded-xl border text-center ${on ? 'text-white border-transparent' : 'border-slate-200 bg-white text-slate-600'}`}
                                 style={on ? { backgroundColor: 'var(--accent)' } : undefined}>
-                          <span className="block text-[11px] font-semibold">{dt.toLocaleDateString('en-IN', { weekday: 'short' })}</span>
+                          <span className="block text-[11px] font-semibold">{dayLabel(d.date, dt)}</span>
                           <span className="block text-sm font-bold">{dt.getDate()} {dt.toLocaleDateString('en-IN', { month: 'short' })}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3" role="group" aria-label="Start time">
-                    {dayTimes.map((t) => (
-                      <button key={t} type="button" onClick={() => setTime(t)}
-                              className={`min-h-11 rounded-xl text-xs font-semibold border ${time === t ? 'text-white border-transparent' : 'border-slate-200 bg-white text-slate-600'}`}
-                              style={time === t ? { backgroundColor: 'var(--accent)' } : undefined}>
-                        {fmt(t)}
-                      </button>
-                    ))}
+                  <div className="mt-3 space-y-3" role="group" aria-label="Start time">
+                    {[['Morning', 0, 12], ['Afternoon', 12, 17], ['Evening', 17, 24]].map(([name, lo, hi]) => {
+                      const part = dayTimes.filter((t) => { const h = parseInt(t, 10); return h >= lo && h < hi; });
+                      if (!part.length) return null;
+                      return (
+                        <div key={name}>
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{name}</p>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {part.map((t) => (
+                              <button key={t} type="button" onClick={() => setTime(t)} aria-pressed={time === t}
+                                      className={`min-h-11 rounded-xl text-xs font-semibold border ${time === t ? 'text-white border-transparent' : 'border-slate-200 bg-white text-slate-600'}`}
+                                      style={time === t ? { backgroundColor: 'var(--accent)' } : undefined}>
+                                {fmt(t)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    {day && time
+                      ? `You picked ${new Date(day + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}, ${fmt(time)} (IST)`
+                      : 'Times are in Indian Standard Time (IST).'}
+                  </p>
                 </>
               )}
             </div>

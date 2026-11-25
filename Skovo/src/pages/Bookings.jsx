@@ -431,11 +431,18 @@ export default function Bookings() {
       .finally(() => { if (seq === bookingsSeq.current) setLoading(false); });
   }, [filter, perPage, classStatus, range]);
 
+  const [sessError, setSessError] = useState('');
   const loadSessions = () => {
     setSessLoading(true);
+    setSessError('');
     api.get('/achievers/my-sessions')
-      .then(({ data }) => { if (data.bool) setSessions(data.response.sessions || []); })
-      .catch(() => {})
+      .then(({ data }) => {
+        if (data.bool) setSessions(data.response.sessions || []);
+        else setSessError(data.response?.message || 'Could not load your 1-on-1 sessions.');
+      })
+      // A failed load used to leave the list empty, which reads as "my booking
+      // vanished". Say so, and offer a retry; the booking itself is safe.
+      .catch(() => setSessError('Could not load your 1-on-1 sessions. Check your connection.'))
       .finally(() => setSessLoading(false));
   };
 
@@ -489,6 +496,14 @@ export default function Bookings() {
   };
 
   useEffect(() => { loadBookings(1); loadSessions(); loadInvoices(); loadMyReviews(); }, []);
+
+  // Come back to the tab (or the phone) later and the achiever may have
+  // confirmed, moved or cancelled something -- pick that up without a reload.
+  useEffect(() => {
+    const onShow = () => { if (document.visibilityState === 'visible') loadSessions(); };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
 
   const handleCancel = async (enrollmentId, payStatus) => {
     const booking = bookings.find(b => b.id === enrollmentId);
@@ -658,6 +673,13 @@ export default function Bookings() {
       <ReviewPrompt sessions={awaitingReview} onRate={setRateSession} />
 
       {/* Tabs: the platform's icon tabs, same as every other screen. */}
+      {sessError && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>{sessError} Your bookings are safe.</span>
+          <button type="button" onClick={loadSessions} className="shrink-0 font-semibold underline">Retry</button>
+        </div>
+      )}
+
       <Tabs active={tab} onChange={setTab} tabs={[
         { key: 'upcoming', label: 'Upcoming', icon: Calendar, count: upcoming.length },
         { key: 'cohorts', label: 'Cohorts', icon: BookOpen, count: pagination.total },

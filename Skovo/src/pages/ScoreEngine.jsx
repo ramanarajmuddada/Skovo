@@ -319,7 +319,7 @@ function LegacyScoreEngine() {
                 <button
                   key={a.event_type}
                   type="button"
-                  onClick={() => navigate(a.route)}
+                  onClick={() => navigate(a.event_type === 'profile_completed' ? '/profile' : a.route)}
                   className="w-full flex items-center gap-3 p-3 min-h-11 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm"

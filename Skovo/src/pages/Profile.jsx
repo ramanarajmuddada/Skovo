@@ -174,6 +174,8 @@ export default function Profile() {
       : [...p.career_interests, i],
   }));
 
+  const startEdit = () => { setFieldErrs({}); setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
   const field = (key, val) => setFormData(p => ({ ...p, [key]: val }));
 
   const pickAvatar = (e) => {
@@ -419,6 +421,12 @@ export default function Profile() {
         <div className="flex items-center gap-2 mb-4">
           <GraduationCap size={16} style={{ color: 'var(--accent)' }} />
           <h3 className="font-bold text-slate-900">Personal Information</h3>
+          {!editing && (
+            <button type="button" onClick={startEdit}
+              className="ml-auto inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              <Edit3 size={13} /> Edit
+            </button>
+          )}
         </div>
         {editing ? (
           <div className="grid sm:grid-cols-2 gap-4">
@@ -570,6 +578,12 @@ export default function Profile() {
         <div className="flex items-center gap-2 mb-4">
           <Briefcase size={16} style={{ color: 'var(--accent)' }} />
           <h3 className="font-bold text-slate-900">Career Interests</h3>
+          {!editing && (
+            <button type="button" onClick={startEdit}
+              className="ml-auto inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              <Edit3 size={13} /> Edit
+            </button>
+          )}
         </div>
         {editing ? (
           <div className="flex flex-wrap gap-2">

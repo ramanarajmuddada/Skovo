@@ -31,9 +31,9 @@ const PREVIEW = [
 
 // What BhaAI reads from, shown before the chat is available.
 const CAN_DO = [
-  { icon: Gauge, title: 'Your readiness score', body: 'What is holding it back and the next step that moves it.' },
-  { icon: FolderOpen, title: 'Your document vault', body: 'What is missing and what to add for the roles you want.' },
-  { icon: GraduationCap, title: 'Colleges and cohorts', body: 'How your saved colleges and cohorts fit your goals.' },
+  { icon: Gauge, to: '/my-score', title: 'Your readiness score', body: 'What is holding it back and the next step that moves it.' },
+  { icon: FolderOpen, to: '/document-vault', title: 'Your document vault', body: 'What is missing and what to add for the roles you want.' },
+  { icon: GraduationCap, to: '/colleges/saved', title: 'Colleges and cohorts', body: 'How your saved colleges and cohorts fit your goals.' },
 ];
 
 function Avatar({ size = 32 }) {
@@ -121,15 +121,16 @@ function Intro({ title, body, children }) {
         </div>
       </div>
       <div className="grid sm:grid-cols-3 gap-3">
-        {CAN_DO.map(({ icon: Icon, title: t, body: b }) => (
-          <div key={t} className="rounded-xl border border-slate-200 p-3.5">
+        {CAN_DO.map(({ icon: Icon, title: t, body: b, to }) => (
+          <Link key={t} to={to}
+                className="block rounded-xl border border-slate-200 p-3.5 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2">
             <span className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
                   style={{ backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)' }}>
               <Icon size={16} />
             </span>
             <p className="text-sm font-semibold text-slate-900">{t}</p>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{b}</p>
-          </div>
+          </Link>
         ))}
       </div>
       {children}

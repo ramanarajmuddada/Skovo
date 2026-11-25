@@ -192,7 +192,7 @@ class ScoreEvents(Resource):
 # reach — suggesting those would be a circular instruction ("shortlist a job to
 # unlock jobs"), so they are filtered out below.
 _ACTION_GUIDE = {
-    'profile_completed':      ('Complete your profile', '/document-vault', False),
+    'profile_completed':      ('Complete your profile', '/profile', False),
     # assessment_completed is v1-hidden — do not send students to /readiness-assessment.
     'cohort_attended':        ('Attend a cohort session', '/cohorts', False),
     'cohort_completed':       ('Finish a cohort and its task', '/cohorts', False),

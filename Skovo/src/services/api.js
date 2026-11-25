@@ -387,8 +387,23 @@ export const api = {
   put: (endpoint, body) => request(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
   patch: (endpoint, body) => request(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
-  upload: (endpoint, formData, opts = {}) =>
-    xhrUpload(endpoint, formData, { ...opts, token: getTokens().accessToken }),
+  // An access token lives 30 minutes. request() quietly swaps in a fresh one when
+  // the server says it has expired; uploads used to send whatever was stored and
+  // fail with "Signature has expired" on a session that was perfectly fine.
+  upload: async (endpoint, formData, opts = {}) => {
+    const { accessToken, refreshToken } = getTokens();
+    const res = await xhrUpload(endpoint, formData, { ...opts, token: accessToken });
+    if (res.status !== 401 || !refreshToken) return res;
+    let fresh;
+    try {
+      fresh = await refreshAccessToken();
+    } catch (err) {
+      clearTokens();
+      window.location.href = '/login';
+      throw err;
+    }
+    return xhrUpload(endpoint, formData, { ...opts, token: fresh });
+  },
 };
 
 // ── Admin API ─────────────────────────────────────────────────────────────────
