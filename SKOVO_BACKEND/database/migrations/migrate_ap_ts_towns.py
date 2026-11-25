@@ -175,7 +175,7 @@ TOWNS = [
     ('AP', 'Yemmiganur', 'Kurnool', 'municipality'),
     ('AP', 'Yerraguntla', 'YSR Kadapa', 'municipality'),
     # ── Telangana ──
-    ('TS', '<br/>Kohir', 'Sangareddy', 'municipality'),
+    ('TS', 'Kohir', 'Sangareddy', 'municipality'),
     ('TS', 'Achampet', 'Nagarkurnool', 'municipality'),
     ('TS', 'Adibatla', 'Ranga Reddy', 'former_ulb'),
     ('TS', 'Adilabad', 'Adilabad', 'municipality'),
@@ -217,7 +217,6 @@ TOWNS = [
     ('TS', 'Devarakonda', 'Nalgonda', 'municipality'),
     ('TS', 'Dharmapuri', 'Jagtial', 'municipality'),
     ('TS', 'Dornakal', 'Mahabubabad', 'municipality'),
-    ('TS', 'Dubbak', 'Siddipet', 'former_ulb'),
     ('TS', 'Dubbaka', 'Siddipet', 'municipality'),
     ('TS', 'Dundigal', 'Medchal-Malkajgiri', 'former_ulb'),
     ('TS', 'Gaddapotharam', 'Sangareddy', 'municipality'),
@@ -268,7 +267,6 @@ TOWNS = [
     ('TS', 'Madhira', 'Khammam', 'municipality'),
     ('TS', 'Mahabubabad', 'Mahabubabad', 'municipality'),
     ('TS', 'Mahbubnagar', 'Mahabubnagar', 'corporation'),
-    ('TS', 'Makhtal', 'Narayanpet', 'municipality'),
     ('TS', 'Makthal', 'Narayanpet', 'former_ulb'),
     ('TS', 'Malkajgiri', 'Medchal-Malkajgiri', 'corporation'),
     ('TS', 'Mancherial', 'Mancherial', 'corporation'),
@@ -359,6 +357,10 @@ AP_DISTRICT_ONLY = [
     'Sri Potti Sriramulu Nellore', 'Sri Sathya Sai', 'West Godavari', 'YSR Kadapa',
 ]
 
+# Rows the first load got wrong. Name -> the correct name, or None when the
+# correct spelling already exists as its own row (so the bad one is switched off).
+TS_FIXES = {'<br/>Kohir': 'Kohir', 'Dubbak': None, 'Makhtal': None}
+
 
 def main():
     with app.app_context():
@@ -402,6 +404,19 @@ def main():
         """).bindparams(bindparam('names', expanding=True)),
             {'s': states['AP'], 'names': AP_DISTRICT_ONLY}).rowcount
 
+        fixed = 0
+        for bad, good in TS_FIXES.items():
+            if good and not db.session.execute(text(
+                    "SELECT 1 FROM `cities` WHERE `state_id`=:s AND `name`=:n"),
+                    {'s': states['TS'], 'n': good}).first():
+                fixed += db.session.execute(text(
+                    "UPDATE `cities` SET `name`=:g WHERE `state_id`=:s AND `name`=:b"),
+                    {'s': states['TS'], 'g': good, 'b': bad}).rowcount
+            else:
+                fixed += db.session.execute(text(
+                    "UPDATE `cities` SET `is_active`=0 WHERE `state_id`=:s AND `name`=:b AND `is_active`=1"),
+                    {'s': states['TS'], 'b': bad}).rowcount
+
         db.session.commit()
 
         for code, sid in states.items():
@@ -410,7 +425,7 @@ def main():
                  WHERE `state_id` = :s AND `is_active` = 1
             """), {'s': sid}).fetchone()
             print(f'{code}: {n} active towns across {d} districts')
-        print(f'added {added}, existing rows touched {filled}, district-only rows switched off {off}')
+        print(f'added {added}, existing rows touched {filled}, district-only rows switched off {off}, bad rows fixed {fixed}')
 
 
 if __name__ == '__main__':
