@@ -311,7 +311,7 @@ const STATUS_FILTERS = [
  *
  *  Read-only by design. An achiever who could delete a bad rating would make
  *  the average meaningless — and these are the same rows an admin reads when
- *  deciding whether to take someone off probation. Moderation of an unfair
+ *  judging an achiever. Moderation of an unfair
  *  review belongs with an admin, not with the person being reviewed.
  */
 function FeedbackModal({ cohort, onClose }) {
@@ -752,7 +752,7 @@ export default function AchieverCohorts() {
                       ? (cardOffer(c) != null
                         ? <><span className="line-through opacity-60 font-medium">{Number(c.price).toLocaleString('en-IN')}</span> {cardOffer(c).toLocaleString('en-IN', { minimumFractionDigits: cardOffer(c) % 1 ? 2 : 0, maximumFractionDigits: 2 })} · Offer</>
                         : Number(c.price).toLocaleString('en-IN'))
-                      : c.is_demo ? 'Free · Demo' : 'Free'}
+                      : 'Free'}
                   </div>
                   {c.meeting_link && (
                     <div className="flex items-center gap-1.5 text-xs text-blue-500">

@@ -528,7 +528,7 @@ function ActivityTab({ s, state }) {
           <Section title="1-on-1 bookings" icon={User}>
             {list(a.bookings).length === 0 ? <None>No bookings.</None> : (
               <ul>{list(a.bookings).map((b, i) => (
-                <Item key={i} title={b.mentor || 'Mentor'} sub={`${when(b.at)}${b.demo ? ' · demo' : ''} · ${b.amount ? rupees(b.amount) : 'free'}`}
+                <Item key={i} title={b.mentor || 'Mentor'} sub={`${when(b.at)} · ${b.amount ? rupees(b.amount) : 'free'}`}
                       right={<StatusBadge status={b.status} />} />
               ))}</ul>
             )}

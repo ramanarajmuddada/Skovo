@@ -5,7 +5,7 @@ Replaces the tier dropdown. There is deliberately no endpoint that sets a
 machine. The previous design let a level be typed directly, which is how an
 achiever ended up listed and charging with no documents on file at all.
 
-    PENDING -> PROBATION -> ACTIVE -> SUSPENDED -> BANNED
+    PENDING -> ACTIVE -> SUSPENDED -> BANNED
                               ^__________|         (terminal)
 """
 import datetime
@@ -22,7 +22,6 @@ from portal.helpers.sp import call_proc, call_proc_one
 from portal.helpers.helpers import serialize_datetime
 from portal.helpers import trust as T
 from portal.helpers.error_capture import capture_error
-from portal.helpers import achiever_demo as D
 from portal.helpers.achiever_notify import (tell_achiever, achiever_url,
                                             PORTAL_PATH)
 from . import ns, logger
@@ -49,9 +48,6 @@ def _parse_seats(raw, required):
         return None, f'Seats must be between {MIN_COHORT_SEATS} and {MAX_COHORT_SEATS}.'
     return seats, None
 
-
-# Floor for a new probation. Extra demos add to the person, not this constant.
-DEMOS_REQUIRED = D.DEFAULT_REQUIRED
 
 # Offered in the UI; an admin may also pass an explicit date. Indefinite is
 # suspended_until = NULL, which the nightly lift job deliberately never touches.
@@ -106,9 +102,8 @@ def _actor_name(actor_id):
 def _notify_state_change(achiever_id, from_state, to_state, reason, until):
     """Tell the achiever what just happened to their account.
 
-    Only the transitions they would notice. A pending -> probation move made by
-    the approve route is announced there, with the seat cap and demo target in
-    it; repeating it here would send two emails for one decision.
+    Only the transitions they would notice. Approval is announced by the
+    approve route itself, with the seat cap in it.
     """
     when = (f" until {until.strftime('%d %b %Y, %H:%M')}" if until else "")
 
@@ -190,19 +185,14 @@ class LifecycleQueue(Resource):
 
     @jwt_required()
     def get(self):
-        """Everyone waiting on an admin, newest first.
-
-        Two queues in one: applications with documents to review, and
-        probations whose three demos are done.
-        """
+        """Everyone waiting on an admin to verify their application."""
         _, err = _guard()
         if err:
             return err
         try:
             rows = db.session.execute(text("""
                 SELECT a.id, a.full_name, a.email, a.state, a.designation, a.company,
-                       a.demo_sessions_done, a.demo_submitted_at, a.created_at,
-                       IFNULL(a.demo_sessions_required, 3) AS demos_required,
+                       a.created_at,
                        (SELECT COUNT(*) FROM achiever_documents d
                          WHERE d.achiever_id = a.id AND d.status = 'pending')  AS docs_pending,
                        (SELECT COUNT(*) FROM achiever_documents d
@@ -216,41 +206,28 @@ class LifecycleQueue(Resource):
                                     AND d.doc_type = t.value COLLATE utf8mb4_unicode_ci
                                     AND d.status IN ('accepted','approved')
                                )) AS docs_missing_required,
-                       -- Appended, not slotted in beside the other identity
-                       -- columns: the result is read positionally, so inserting
-                       -- a column in the middle silently renumbers every field
-                       -- after it. The photo the achiever uploaded, falling back
-                       -- to the one an admin typed in on the Achievers screen.
+                       -- The result is read positionally: append, never insert.
+                       -- The photo the achiever uploaded, falling back to the
+                       -- one an admin typed in on the Achievers screen.
                        IFNULL(a.profile_image_url, a.avatar_url) AS photo,
-                       -- Also appended. Carried on the row so the approve
-                       -- dialog can open on the cap this achiever already has
-                       -- instead of an empty box: someone coming back through
-                       -- the queue after an unban keeps their allocation, and
-                       -- re-typing it is how it gets changed by accident.
+                       -- So the approve dialog opens on the cap they already have.
                        a.cohort_seat_allocation AS cohort_seats
                   FROM achievers a
-                 -- Decided achievers are included when asked for. The queue
-                 -- used to end at 'probation', so the moment someone was
-                 -- approved their documents, background check and demo reviews
-                 -- became unreachable -- the record you most want to re-read is
-                 -- the one you just made a decision on.
-                 WHERE (:all_states = 1 OR a.state IN ('pending', 'probation'))
-                 ORDER BY (a.state IN ('pending','probation')) DESC,
-                          (a.state = 'probation' AND a.demo_submitted_at IS NOT NULL) DESC,
-                          a.created_at
+                 -- Decided achievers are included when asked for, so a record
+                 -- stays readable after the decision is made.
+                 WHERE (:all_states = 1 OR a.state = 'pending')
+                 ORDER BY (a.state = 'pending') DESC, a.created_at
                  LIMIT 200
             """), {'all_states': 1 if request.args.get('scope') == 'all' else 0}).fetchall()
 
             return jsonify(response={'items': [{
                 'achiever_id': r[0], 'full_name': r[1], 'email': r[2], 'state': r[3],
                 'designation': r[4], 'company': r[5],
-                'demos_done': r[6], 'demos_required': r[9],
-                'awaiting_decision': bool(r[3] == 'probation' and r[7]),
-                'documents_pending': r[10], 'documents_accepted': r[11],
-                'documents_missing_required': r[12],
-                'profile_image_url': r[13],
-                'cohort_seat_allocation': r[14],
-                'applied_at': serialize_datetime(r[8]) if r[8] else None,
+                'documents_pending': r[7], 'documents_accepted': r[8],
+                'documents_missing_required': r[9],
+                'profile_image_url': r[10],
+                'cohort_seat_allocation': r[11],
+                'applied_at': serialize_datetime(r[6]) if r[6] else None,
             } for r in rows]}, status=200, bool=True)
         except Exception as e:
             error_id = capture_error(e)
@@ -263,12 +240,10 @@ class ApproveApplication(Resource):
 
     @jwt_required()
     def post(self, achiever_id):
-        """PENDING -> PROBATION. Refuses unless every required document is accepted.
+        """PENDING -> ACTIVE. Refuses unless every required document is accepted.
 
-        Approving also sets how many seats each of this achiever's cohorts may
-        hold. It is decided here, at the first gate, rather than at the
-        probation gate beside the commission rate: achievers run free demo
-        cohorts *during* probation, so waiting would leave those uncapped.
+        Verification is the only gate: once approved the achiever can create
+        paid cohorts. Approving also sets how many seats each cohort may hold.
         """
         actor, err = _guard()
         if err:
@@ -303,33 +278,25 @@ class ApproveApplication(Resource):
             # ── SP: sp_achiever_approve_application ──────────────────────────
             call_proc_one('sp_achiever_approve_application', achiever_id, actor, seats)
             db.session.commit()
-            # Read back rather than assume. The SP keeps a target an admin set
-            # by hand and only falls back to the default when there isn't one,
-            # so reporting D.DEFAULT_REQUIRED here would tell the screen 3 while
-            # the account says 1 - exactly the disagreement this path had.
-            demos = db.session.execute(
-                text("SELECT demo_sessions_required FROM achievers WHERE id = :i"),
-                {'i': achiever_id}).scalar() or D.DEFAULT_REQUIRED
-            # The one email an applicant is actually waiting for. It carries the
-            # two numbers that decide what they do next, because "you have been
-            # approved" without the demo target sends them straight back to the
-            # portal to find out what approval means.
             tell_achiever(
                 achiever_id, 'Your SKOVO application has been approved',
-                'An admin has reviewed your documents and approved your application.\n\n'
-                f'You are now on probation. Run {demos} free demo '
-                f'session{"" if demos == 1 else "s"} and an admin will review them '
-                'before you can charge for your time.\n\n'
+                'An admin has reviewed your documents and verified your account.\n\n'
+                'You can now create paid cohorts from your portal.\n\n'
                 + (f'Each cohort you create is capped at {seats} student'
                    f'{"" if seats == 1 else "s"}.' if seats
                    else 'Your cohorts are uncapped.'),
                 button_url=achiever_url(PORTAL_PATH),
                 button_label='Open your portal', type='system')
+            # They are active now: a referral waiting on that can complete.
+            try:
+                from portal.helpers.referral_rewards import on_achiever_active
+                on_achiever_active(achiever_id)
+            except Exception as pay_err:
+                logger.error(f"referral pay after approval failed for {achiever_id}: {pay_err}")
             return jsonify(response={
-                'message': ((f'Application approved with {seats} seats per cohort. '
-                             if seats else 'Application approved with unlimited seats. ')
-                            + 'They can now run free demo sessions.'),
-                'demos_required': demos,
+                'message': ((f'Achiever verified with {seats} seats per cohort. '
+                             if seats else 'Achiever verified with unlimited seats. ')
+                            + 'They can now create paid cohorts.'),
                 'cohort_seat_allocation': seats,
             }, status=200, bool=True)
         except Exception as e:
@@ -405,243 +372,6 @@ class CohortSeatAllocation(Resource):
                            status=500, bool=False)
 
 
-@ns.route('/achiever-lifecycle/<string:achiever_id>/probation')
-class ProbationReview(Resource):
-
-    @jwt_required()
-    def get(self, achiever_id):
-        """The three demo sessions and what each student said about them."""
-        _, err = _guard()
-        if err:
-            return err
-        try:
-            payload = D.review_payload(achiever_id)
-            return jsonify(response=payload, status=200, bool=True)
-        except Exception as e:
-            error_id = capture_error(e)
-            return jsonify(response={'message': 'Internal Server Error', 'error_id': error_id},
-                           status=500, bool=False)
-
-    @jwt_required()
-    def post(self, achiever_id):
-        """The probation verdict: approve, extend, or reject.
-
-        Approving also sets the session rate — achievers do not price
-        themselves, so activating without a rate would leave them live and
-        unbookable.
-        """
-        actor, err = _guard()
-        if err:
-            return err
-        data = request.get_json() or {}
-        decision = (data.get('decision') or '').strip().lower()
-        reason = (data.get('reason') or '').strip()
-
-        if decision not in ('approve', 'extend', 'reject', 'set_demos'):
-            return jsonify(response={
-                'message': "decision must be approve, extend, reject or set_demos.",
-            }, status=400, bool=False)
-        if not reason:
-            return jsonify(response={'message': 'A reason is required.'}, status=400, bool=False)
-
-        try:
-            if decision == 'approve':
-                row = db.session.execute(text(
-                    "SELECT IFNULL(demo_sessions_done, 0), "
-                    "       IFNULL(demo_sessions_required, 3) FROM achievers WHERE id = :i"
-                ), {'i': achiever_id}).fetchone()
-                done = int(row[0] or 0) if row else 0
-                needed = int(row[1] or D.DEFAULT_REQUIRED) if row else D.DEFAULT_REQUIRED
-                if done < needed:
-                    return jsonify(response={
-                        'message': (f'{done} of {needed} demo sessions are done. '
-                                    'Approve once they are complete, or ask for more.'),
-                        'demos_done': done,
-                        'demos_required': needed,
-                    }, status=409, bool=False)
-
-                # Commission, not a session price. What varies between achievers is
-                # the platform's share -- negotiated per person and versioned in
-                # commission_rules, so an order priced last month can still be
-                # explained by the rule that was live then.
-                percent = data.get('commission_percent')
-                if percent is None:
-                    return jsonify(response={
-                        'message': 'A commission percentage is required when approving.',
-                    }, status=400, bool=False)
-                try:
-                    percent = float(percent)
-                except (TypeError, ValueError):
-                    return jsonify(response={'message': 'commission_percent must be a number.'},
-                                   status=400, bool=False)
-                if not (0 <= percent <= 100):
-                    return jsonify(response={'message': 'Commission must be between 0 and 100.'},
-                                   status=400, bool=False)
-
-                # ── SP: sp_commission_set_for_achiever — closes the old rule and
-                # opens a new one, same procedure the commission panel uses. ────
-                call_proc_one('sp_commission_set_for_achiever', achiever_id,
-                              round(percent / 100.0, 4),
-                              f'Set on approval out of probation: {reason}'[:255],
-                              get_jwt_identity())
-                db.session.commit()
-                tell_achiever(
-                    achiever_id, 'You are now a verified SKOVO achiever',
-                    'An admin has reviewed your demo sessions and approved you out '
-                    'of probation.\n\nYou can now take paid sessions and create paid '
-                    f'cohorts. SKOVO keeps {percent}% of each one.\n\n'
-                    f'Reason given: {reason}',
-                    button_url=achiever_url(PORTAL_PATH),
-                    button_label='Open your portal', type='system')
-                return _state_change(achiever_id, 'active', reason)
-
-            if decision == 'set_demos':
-                # Set the target, rather than add to it — and send them back to
-                # demos from wherever they are.
-                #
-                # Two gaps this closes, both of which had no answer at all:
-                #
-                #   1. `extend` only ever computed needed_now + extra, so a demo
-                #      target could go up and never down. An achiever sitting on
-                #      13 because someone pressed "ask for more" four times had
-                #      no way back to 3.
-                #   2. `extend` never wrote `state`, and its control was
-                #      probation-only. So an ACTIVE achiever whose reviews had
-                #      gone bad after ten cohorts could not be put back on demo
-                #      classes by any route. Calling extend on them would have
-                #      raised the target and left them active and still
-                #      charging, which is worse than refusing.
-                #
-                # Deliberately NOT a cascade. Suspension already exists for
-                # "stop everything now" and carries the refund logic. This is
-                # "prove yourself again": probation removes `can_charge`, so no
-                # NEW paid cohort or booking can be created, while the cohorts
-                # and confirmed sessions students have already paid for run to
-                # completion. Reviewers punish the achiever, not the students.
-                target = data.get('demos_required')
-                try:
-                    target = int(target)
-                except (TypeError, ValueError):
-                    target = None
-                if target is None or target < 1:
-                    return jsonify(response={
-                        'message': 'Say how many demos they need — a whole number, at least 1.',
-                    }, status=400, bool=False)
-
-                # One procedure, not an UPDATE here and a state change there.
-                # Split across two statements the demote can half-apply: the
-                # target lands, the transition fails, and the achiever is left
-                # active with a target nobody asked for.
-                # -- SP: sp_achiever_set_demo_target -------------------------
-                try:
-                    row = call_proc_one('sp_achiever_set_demo_target', achiever_id,
-                                        target, reason[:255], actor) or {}
-                except Exception as e:
-                    msg = str(e)
-                    if 'ACHIEVER_NOT_FOUND' in msg:
-                        return jsonify(response={'message': 'Achiever not found.'},
-                                       status=404, bool=False)
-                    if 'ACHIEVER_BANNED' in msg:
-                        return jsonify(response={
-                            'message': 'This achiever is banned. Lift the ban first.',
-                        }, status=400, bool=False)
-                    raise
-                db.session.commit()
-
-                was_state = row.get('from_state')
-                done_now = int(row.get('demos_done') or 0)
-                logger.info("achiever %s demo target set to %s (was %s)",
-                            achiever_id, target, was_state)
-                tell_achiever(
-                    achiever_id,
-                    ('You have been asked to run demo sessions again'
-                     if was_state != 'probation' else 'Your demo target has changed'),
-                    f'An admin has set your demo target to {target} completed '
-                    f'session{"" if target == 1 else "s"}. You have {done_now} so far.\n\n'
-                    f'Reason given: {reason}',
-                    # No email for a number moving on a screen they are already
-                    # watching; the bell is the right weight for this one.
-                    email=(was_state != 'probation'),
-                    button_url=achiever_url(PORTAL_PATH),
-                    button_label='Open your portal', type='system')
-                return jsonify(response={
-                    'message': (f'Sent back to demos - they need {target} completed '
-                                f'sessions ({done_now} done so far).'
-                                if was_state != 'probation' else
-                                f'They now need {target} completed demo sessions '
-                                f'({done_now} done so far).'),
-                    'state': 'probation',
-                    'demos_done': done_now,
-                    'demos_required': target,
-                }, status=200, bool=True)
-
-            if decision == 'extend':
-                extra = data.get('extra_demos')
-                try:
-                    extra = int(extra)
-                except (TypeError, ValueError):
-                    extra = None
-                # Any positive number. EXTRA_ALLOWED restricted this to 1, 2 or 3 and
-                # MAX_REQUIRED capped the total at 12; both are gone. How many demos a
-                # particular achiever should run is a judgement about that person, made
-                # by the admin who has read their reviews - not a constant in a file.
-                if extra is None or extra < 1:
-                    return jsonify(response={
-                        'message': 'Say how many more demos — a whole number, at least 1.',
-                    }, status=400, bool=False)
-
-                current = db.session.execute(text(
-                    "SELECT IFNULL(demo_sessions_required, 3), IFNULL(demo_sessions_done, 0) "
-                    "  FROM achievers WHERE id = :i"
-                ), {'i': achiever_id}).fetchone()
-                needed_now = int(current[0] or D.DEFAULT_REQUIRED) if current else D.DEFAULT_REQUIRED
-                done_now = int(current[1] or 0) if current else 0
-                needed_next = needed_now + extra
-                # No ceiling. MAX_REQUIRED used to cap the target at 12, which meant an
-                # admin who wanted more had no way to say so - the request was refused
-                # with a number nobody had chosen. How many demos a particular achiever
-                # should run is a judgement about that person, and the admin making it
-                # is the one who has read their reviews.
-
-                # Stay in probation. Raising the target and clearing the
-                # submission stamp puts them back in collecting, not ready.
-                db.session.execute(text(
-                    "UPDATE achievers SET demo_sessions_required = :n, "
-                    "demo_submitted_at = NULL, state_reason = :r, "
-                    "updated_at = UTC_TIMESTAMP() WHERE id = :i"
-                ), {'n': needed_next, 'r': reason, 'i': achiever_id})
-                db.session.commit()
-                tell_achiever(
-                    achiever_id, 'An admin has asked for more demo sessions',
-                    f'Your demo target has gone from {needed_now} to {needed_next} '
-                    f'completed sessions. You have {done_now} so far.\n\n'
-                    f'Reason given: {reason}',
-                    button_url=achiever_url(PORTAL_PATH),
-                    button_label='Open your portal', type='system')
-                return jsonify(response={
-                    'message': (f'Asked for {extra} more. They now need {needed_next} '
-                                f'completed demos ({done_now} done so far).'),
-                    'state': 'probation',
-                    'demos_done': done_now,
-                    'demos_required': needed_next,
-                    'extra_demos': extra,
-                }, status=200, bool=True)
-
-            tell_achiever(
-                achiever_id, 'Your probation review did not pass',
-                'An admin has reviewed your demo sessions and sent your account '
-                f'back for review.\n\nReason given: {reason}',
-                button_label='View your application', type='system')
-            return _state_change(achiever_id, 'pending', reason)
-
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"probation decision failed for {achiever_id}: {e}")
-            error_id = capture_error(e)
-            return jsonify(response={'message': 'Internal Server Error', 'error_id': error_id},
-                           status=500, bool=False)
-
-
 @ns.route('/achiever-lifecycle/<string:achiever_id>/suspend')
 class SuspendAchiever(Resource):
 
@@ -684,16 +414,9 @@ class ReinstateAchiever(Resource):
     @jwt_required()
     def post(self, achiever_id):
         """Lift a suspension early, back to the state they were suspended from.
-        
-        NOT unconditionally 'active'. That is the same mistake the nightly lift
-        job made: a probation achiever reinstated straight to active skips the
-        demo review and the commission, which is the whole of what probation is
-        for. achiever_state_events carries where they came from, so the manual
-        lift and the automatic one now agree.
-        
-        Falls back to 'pending' when the record cannot say, for the reason it
-        does there too: a wrongly demoted achiever is one click to restore, a
-        wrongly promoted one is an unvetted person taking students' money.
+
+        NOT unconditionally 'active': someone suspended while still pending must
+        go back to review. Falls back to 'pending' when the record cannot say.
         """
         data = request.get_json() or {}
         prior = db.session.execute(text(
@@ -702,6 +425,9 @@ class ReinstateAchiever(Resource):
             "   AND from_state IN ('pending', 'probation', 'active') "
             " ORDER BY created_at DESC LIMIT 1"
         ), {'i': achiever_id}).scalar()
+        # History written before demo sessions were removed.
+        if prior == 'probation':
+            prior = 'active'
         return _state_change(achiever_id, prior or 'pending',
                              (data.get('reason') or 'Reinstated by admin').strip())
 
@@ -738,12 +464,8 @@ class UnbanAchiever(Resource):
         can undo a ban by accident. Undoing one has to be asked for by name.
 
         Lifting a ban is a reversal, so it puts them back where the ban found
-        them: an achiever banned mid-probation returns to probation, one banned
-        while active returns to active. This used to land everyone on 'pending',
-        which quietly cost them their place -- the second approval that then had
-        to happen was also what reset their demo target. The prior state is read
-        from the ban's own event row, not guessed. Only a ban with no recorded
-        history falls back to review.
+        them. The prior state is read from the ban's own event row. Only a ban
+        with no recorded history falls back to review.
         """
         actor, err = _guard()
         if err:
@@ -773,9 +495,7 @@ class UnbanAchiever(Resource):
                 achiever_id, 'Your SKOVO account has been reopened',
                 'An admin has lifted the closure on your account.\n\n'
                 f'Reason given: {reason}\n\n'
-                + ('You are back on probation, where you were before.'
-                   if restored == 'probation' else
-                   'You are active again and can take students.'
+                + ('You are active again and can take students.'
                    if restored == 'active' else
                    'Your application is back in the review queue.')
                 + ' Your documents and agreements are as you left them.',
@@ -785,7 +505,6 @@ class UnbanAchiever(Resource):
             # started restoring the prior one.
             wording = {
                 'pending':   'Ban lifted. They are back in the review queue as pending.',
-                'probation': 'Ban lifted. They are back on probation, where the ban found them.',
                 'active':    'Ban lifted. They are active again and can take students.',
                 'suspended': 'Ban lifted. They return to the suspension that was in place before it.',
             }
@@ -886,7 +605,7 @@ class AchieverDossier(Resource):
                     # The two dates the detail view had no way to show.
                     #
                     # `application_status` on its own reads as a contradiction
-                    # once someone is past pending: an achiever on probation
+                    # once someone is past pending: a verified achiever
                     # still says "submitted", because approving the application
                     # moves `state` and leaves that column alone. A date says
                     # the same fact without arguing with the badge beside it.
@@ -911,8 +630,6 @@ class AchieverDossier(Resource):
                     # these were always on the row and simply never mapped out.
                     # The Achievers detail view needs them to show the same
                     # record this screen does, without a second round trip.
-                    'demos_done': a.get('demo_sessions_done') or 0,
-                    'demos_required': a.get('demo_sessions_required') or 3,
                     'cohort_seat_allocation': a.get('cohort_seat_allocation'),
                     # The other three status columns. The review screens read
                     # only `state`, so an admin could not see that a background

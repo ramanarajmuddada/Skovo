@@ -131,7 +131,7 @@ function sessionContext(session) {
  *
  * The Rate button already existed on each completed session, but it sat inside
  * a list the student has no reason to scroll back to once the session is over.
- * Reviews are what decide whether a demo achiever can start charging, so the
+ * Reviews shape how students judge an achiever, so the
  * ask has to find the student rather than wait to be found.
  *
  * Silent when there is nothing to review — a permanent empty box trains people

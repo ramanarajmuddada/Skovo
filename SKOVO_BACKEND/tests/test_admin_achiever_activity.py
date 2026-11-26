@@ -128,9 +128,9 @@ def test_activity_counts_cohorts_students_sessions_and_reviews(app, client, db, 
 
 
 @pytest.mark.case('ADM-ACH-002')
-def test_reinstate_returns_a_probation_achiever_to_probation(app, client, db, world):
+def test_reinstate_returns_a_pending_achiever_to_pending(app, client, db, world):
     db.session.execute(text("""
-        UPDATE achievers SET state = 'probation' WHERE id = :i
+        UPDATE achievers SET state = 'pending' WHERE id = :i
     """), {'i': world['achiever']})
     db.session.commit()
 
@@ -150,8 +150,8 @@ def test_reinstate_returns_a_probation_achiever_to_probation(app, client, db, wo
         headers=hdr,
     ))
     assert rein['status'] == 200, rein
-    assert rein['response']['to_state'] == 'probation', rein
+    assert rein['response']['to_state'] == 'pending', rein
     state = db.session.execute(
         text('SELECT state FROM achievers WHERE id = :i'), {'i': world['achiever']}
     ).scalar()
-    assert state == 'probation'
+    assert state == 'pending'

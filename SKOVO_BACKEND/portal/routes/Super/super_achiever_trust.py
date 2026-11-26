@@ -150,7 +150,7 @@ class BGVWebhook(Resource):
             # at once. A super admin reinstates after reading the report.
             if result == 'failed':
                 a = call_proc_one('sp_achievers_get', achiever_id) or {}
-                if (a.get('state') or '') in ('active', 'probation'):
+                if (a.get('state') or '') == 'active':
                     since = datetime.datetime.utcnow()
                     call_proc_one('sp_achiever_set_state', achiever_id, 'suspended',
                                   'Background check returned an adverse result',

@@ -11,7 +11,7 @@ import { studentSiteUrl } from '../../utils/portalHost';
 
 const CAPABILITIES = [
   { icon: Users,         label: 'Students',      sub: 'Accounts, cohort placement, readiness' },
-  { icon: UserCheck,     label: 'Achievers',     sub: 'Applications, verification, probation review' },
+  { icon: UserCheck,     label: 'Achievers',     sub: 'Applications and verification' },
   { icon: CalendarCheck, label: 'Bookings',      sub: 'Sessions, reschedules, no-shows' },
   { icon: IndianRupee,   label: 'Payments',      sub: 'Captures, payouts, coupons' },
   { icon: GraduationCap, label: 'Colleges',      sub: 'Listings, reviews, course catalogue' },

@@ -34,7 +34,7 @@ list_parser.add_argument('page', type=int, location='args', default=1)
 list_parser.add_argument('per_page', type=int, location='args', default=20)
 list_parser.add_argument('search', type=str, location='args', required=False)
 list_parser.add_argument('status', type=str, location='args', required=False)
-list_parser.add_argument('kind', type=str, location='args', required=False)         # demo | free | paid
+list_parser.add_argument('kind', type=str, location='args', required=False)         # free | paid
 list_parser.add_argument('achiever_id', type=str, location='args', required=False)
 list_parser.add_argument('date_from', type=str, location='args', required=False)   # YYYY-MM-DD, IST
 list_parser.add_argument('date_to', type=str, location='args', required=False)
@@ -57,9 +57,7 @@ update_parser.add_argument('meeting_link', type=str, location='json', required=F
 
 
 def _cohort_kind(c):
-    """demo = free class run on probation; free = no charge after approval; paid."""
-    if c.get('is_demo'):
-        return 'demo'
+    """free = no charge; paid."""
     return 'paid' if (c.get('price') or 0) > 0 else 'free'
 
 

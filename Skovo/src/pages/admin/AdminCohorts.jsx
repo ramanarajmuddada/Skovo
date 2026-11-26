@@ -145,7 +145,7 @@ const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('en-IN', { dateStyle
           </div>
           {/* Who joined, attended, paid (coupon, discount) and reviewed. */}
           {c.achiever?.id && (
-            <CohortDetail achieverId={c.achiever.id} cohort={{ ...c, is_demo: c.kind === 'demo', is_free: !(c.price > 0) }} hideHeader />
+            <CohortDetail achieverId={c.achiever.id} cohort={{ ...c, is_free: !(c.price > 0) }} hideHeader />
           )}
         </div>
         <div className="px-6 pb-5 flex gap-3">
@@ -167,9 +167,8 @@ const STATUS_COLOR = {
 
 
 
-// Demo = free class run on probation; Free = no charge after approval.
+// Free = no charge; Paid = priced.
 const KIND = {
-  demo: { label: 'Demo', cls: 'bg-violet-100 text-violet-700' },
   free: { label: 'Free', cls: 'bg-slate-100 text-slate-600' },
   paid: { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' },
 };
@@ -326,7 +325,7 @@ export default function AdminCohorts() {
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5 mb-4" role="group" aria-label="Cohort type">
-        {[['', 'All types'], ['demo', 'Demo'], ['free', 'Free'], ['paid', 'Paid']].map(([k, l]) => (
+        {[['', 'All types'], ['free', 'Free'], ['paid', 'Paid']].map(([k, l]) => (
           <button key={k || 'all'} type="button" onClick={() => { setKind(k); pickFilter('kind', k); }}
                   className={`min-h-9 px-3 rounded-full text-xs font-semibold ${kind === k ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{l}</button>
         ))}

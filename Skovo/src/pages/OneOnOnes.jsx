@@ -88,7 +88,7 @@ export default function OneOnOnes() {
         <BookModal
           mentor={{ mentor_id: booking.achiever.id, id: booking.achiever.id, full_name: booking.achiever.name,
                     designation: booking.achiever.designation, company: booking.achiever.company,
-                    profile_image_url: booking.achiever.photo, is_demo_achiever: !!booking.demo }}
+                    profile_image_url: booking.achiever.photo }}
           initialOffering={booking.id}
           onClose={() => setBooking(null)}
           onBooked={() => { setBooking(null); setPage(1); }} />
@@ -143,7 +143,7 @@ export default function OneOnOnes() {
       ) : (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map((o) => {
-            const off = !o.demo && o.offer_type && Number(o.final_price) < Number(o.price);
+            const off = o.offer_type && Number(o.final_price) < Number(o.price);
             const a = o.achiever;
             return (
               <div key={o.id} className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col">
@@ -154,7 +154,7 @@ export default function OneOnOnes() {
                     <p className="font-black text-slate-900">{Number(o.final_price) > 0 ? rupee(o.final_price) : 'Free'}</p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">{lenLabel(o.duration_min)}{o.demo ? ' · Free demo' : ''}{off ? ' · Offer' : ''}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{lenLabel(o.duration_min)}{off ? ' · Offer' : ''}</p>
                 {o.about && <p className="text-sm text-slate-600 mt-2 line-clamp-2">{o.about}</p>}
                 <Link to={`/achievers/${a.id}`} className="flex items-center gap-2.5 mt-3 group">
                   {a.photo

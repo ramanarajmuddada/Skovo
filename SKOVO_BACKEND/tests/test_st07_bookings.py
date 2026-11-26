@@ -3,7 +3,7 @@ ST-07 Bookings (1-on-1) — all 11 cases.
 
 The five named refusals (ST07-002…006) are the reason this sheet is P0. They all
 arrive at the student as a message, and the sheet asks for each to be *distinct*
-— "Achiever not found" and "this achiever is running free demo sessions" send a
+— "Achiever not found" and "this achiever is not yet available" send a
 student to two completely different next actions, and collapsing them into one
 "unavailable" is the same defect class as the unaliased procedure branches that
 turned every enrolment refusal into "Unable to enroll."
@@ -47,7 +47,7 @@ def world(app, db):
     ambiguous about which state produced it.
     """
     ids = {k: str(uuid.uuid4()) for k in
-           ('student', 'active', 'inactive', 'unverified', 'probation')}
+           ('student', 'active', 'inactive', 'unverified')}
     db.session.execute(text("""
         INSERT INTO users (id, full_name, email, status, created_at, updated_at)
         VALUES (:i, 'ST07 Student', :e, 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP())
@@ -56,13 +56,11 @@ def world(app, db):
     # The `active` achiever is deliberately FREE (rate 0). A paid rate sends the
     # booking into the Cashfree flow, which cannot complete an order on this
     # account at all — so the happy-path cases would fail at the gateway and
-    # prove nothing about booking. `probation` keeps a paid rate, because
-    # ST07-005 is precisely "probation may not charge".
+    # prove nothing about booking.
     for key, state, is_active, verified, rate in (
         ('active',     'active',    1, 1, 0),
         ('inactive',   'suspended', 0, 1, 500),
         ('unverified', 'pending',   1, 0, 500),
-        ('probation',  'probation', 1, 1, 500),
     ):
         db.session.execute(text("""
             INSERT INTO achievers (id, full_name, email, state, status, is_active,
@@ -87,7 +85,7 @@ def world(app, db):
     ids['slot'] = slot
     yield ids
 
-    aids = tuple(ids[k] for k in ('active', 'inactive', 'unverified', 'probation'))
+    aids = tuple(ids[k] for k in ('active', 'inactive', 'unverified'))
     for sql, params in [
         ('DELETE FROM achiever_reviews WHERE user_id = :u', {'u': ids['student']}),
         ('DELETE FROM achiever_slots WHERE mentor_id IN :a', {'a': aids}),
@@ -164,17 +162,6 @@ def test_an_unverified_achiever_is_refused_with_its_own_reason(book, world):
     assert d['status'] in (400, 403, 404), d
     assert 'not yet available' in message(d) or 'not found' in message(d).lower(), \
         message(d)
-
-
-@pytest.mark.case('ST07-005')
-def test_a_probation_achiever_is_free_demo_only(book, world):
-    """`can_charge` is active-only, so a probation achiever with a session rate
-    must be refused for a *paid* booking — and told why, because the answer is
-    'come back later', not 'this person does not exist'."""
-    slot = world['slot']('probation')
-    code, d = book('probation', slot)
-    assert d['status'] in (400, 403), d
-    assert 'free demo' in message(d).lower(), message(d)
 
 
 @pytest.mark.case('ST07-006')

@@ -74,7 +74,7 @@ export default function AchieverAuthLayout({ children }) {
             style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <ShieldCheck size={16} className="mt-0.5 shrink-0 text-slate-400" />
             <p className="text-slate-400 text-xs leading-relaxed">
-              Every achiever is verified before teaching — documents, background check and a short demo session.
+              Every achiever is verified before teaching — documents and background check.
             </p>
           </div>
         </div>

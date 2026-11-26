@@ -629,8 +629,7 @@ INSERT INTO `master_cohort_level` (`id`,`value`,`label`,`sort_order`,`is_active`
 INSERT INTO `master_cohort_level` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('e4c99fca-ea65-4a0c-ae82-662c74b87e2b', 'advanced', 'Advanced', 30, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
 
 -- master_cohort_seats  (8 options)
--- 5 and 10 exist because the first cohorts an achiever runs are their free
--- demos during probation, and a demo in front of 50 strangers is not a demo.
+-- 5 and 10 exist for small first cohorts.
 -- They used to live only in a SEAT_PRESETS array in the admin console.
 INSERT INTO `master_cohort_seats` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('c1a7e4d2-1f60-4b8e-9d33-70f1a2c5e001', '5', '5 seats', 10, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
 INSERT INTO `master_cohort_seats` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('c1a7e4d2-1f60-4b8e-9d33-70f1a2c5e002', '10', '10 seats', 20, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
@@ -1509,4 +1508,3 @@ INSERT INTO `master_achiever_queue_filter` (`id`,`value`,`label`,`sort_order`,`i
 INSERT INTO `master_achiever_queue_filter` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('8f2b1c04-6d31-4e58-9a77-2c5d0e1a9b02', 'everyone', 'Including decided', 20, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
 INSERT INTO `master_achiever_queue_filter` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('8f2b1c04-6d31-4e58-9a77-2c5d0e1a9b03', 'pending', 'Documents to review', 30, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
 INSERT INTO `master_achiever_queue_filter` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('8f2b1c04-6d31-4e58-9a77-2c5d0e1a9b04', 'decision', 'Ready to decide', 40, 1) ON DUPLICATE KEY UPDATE `id`=`id`;
-INSERT INTO `master_achiever_queue_filter` (`id`,`value`,`label`,`sort_order`,`is_active`) VALUES ('8f2b1c04-6d31-4e58-9a77-2c5d0e1a9b05', 'probation', 'In probation', 50, 1) ON DUPLICATE KEY UPDATE `id`=`id`;

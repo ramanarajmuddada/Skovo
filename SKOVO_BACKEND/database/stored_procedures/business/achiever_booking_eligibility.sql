@@ -44,19 +44,13 @@ BEGIN
     ELSEIF v_active = 0 THEN
         SELECT 0 AS ok, 'inactive' AS reason, v_state AS state;
 
-    -- Listed and bookable while active or on probation. A probation achiever
-    -- must be bookable: demo sessions are how they earn their way to active.
-    ELSEIF v_state IS NULL OR v_state NOT IN ('active', 'probation') THEN
+    -- Only a verified (active) achiever is listed and bookable.
+    ELSEIF v_state IS NULL OR v_state <> 'active' THEN
         SELECT 0 AS ok, 'unverified' AS reason, v_state AS state;
 
     -- No age or parental-consent gate. Age is still recorded on the user row,
     -- so this can be reinstated by restoring the two branches that were here;
     -- nothing downstream needs to change for that.
-
-    -- Charging is the one thing probation cannot do. Free demo sessions with a
-    -- probation achiever are the whole point of the state.
-    ELSEIF v_rate > 0 AND v_state <> 'active' THEN
-        SELECT 0 AS ok, 'achiever_cannot_charge' AS reason, v_state AS state;
 
     ELSE
         SELECT 1 AS ok, 'ok' AS reason, v_state AS state;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Circle, Clock, XCircle, AlertTriangle, Ban, Sparkles, LifeBuoy } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, XCircle, AlertTriangle, Ban, LifeBuoy } from 'lucide-react';
 
 /**
  * What the achiever should do next, said once at the top of the dashboard.
@@ -16,7 +16,6 @@ import { CheckCircle2, Circle, Clock, XCircle, AlertTriangle, Ban, Sparkles, Lif
 
 const TONE = {
   pending:   { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-900',    Icon: Clock },
-  probation: { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-900',   Icon: Sparkles },
   active:    { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900', Icon: CheckCircle2 },
   suspended: { bg: 'bg-orange-50',  border: 'border-orange-200',  text: 'text-orange-900',  Icon: AlertTriangle },
   banned:    { bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-900',     Icon: Ban },
@@ -54,7 +53,7 @@ function ChecklistRow({ item }) {
 }
 
 export default function LifecycleBanner({ lifecycle }) {
-  const { state, guidelines, checklist, demo, data } = lifecycle;
+  const { state, guidelines, checklist, data } = lifecycle;
   if (!guidelines) return null;
 
   const tone = TONE[state] || TONE.pending;
@@ -96,45 +95,6 @@ export default function LifecycleBanner({ lifecycle }) {
               {state === 'suspended' && !data.suspended_until && (
                 <p className="text-xs text-slate-500 mt-2">
                   No end date has been set. Contact support to discuss it.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Probation progress — the person's target, not a hardcoded 3. */}
-          {state === 'probation' && demo && (
-            <div className="mt-3">
-              <div className="h-2 rounded-full bg-amber-200 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-amber-500 transition-all"
-                  style={{
-                    width: `${demo.required > 0
-                      ? Math.min(100, (demo.completed / demo.required) * 100)
-                      : 0}%`,
-                  }}
-                />
-              </div>
-              <p className="text-sm text-amber-900 font-medium mt-2">
-                {demo.completed} of {demo.required} demo {demo.required === 1 ? 'session' : 'sessions'} complete
-                {demo.remaining > 0 && ` · ${demo.remaining} to go`}
-              </p>
-              {/* Labelled, like the suspended and banned version above it.
-                  Unlabelled it was a boxed sentence floating between the
-                  progress bar and the numbered steps -- the achiever could see
-                  somebody had written to them but not what about. */}
-              {data?.state_reason && !/^Application approved/i.test(data.state_reason) && (
-                <div className="mt-2 bg-white/70 border border-white rounded-xl p-3">
-                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
-                    Note from SKOVO
-                  </p>
-                  <p className="text-sm text-amber-800 mt-1 leading-relaxed">
-                    {data.state_reason}
-                  </p>
-                </div>
-              )}
-              {demo.remaining === 0 && (
-                <p className="text-sm text-amber-800 mt-1">
-                  {demo.required === 1 ? 'Done.' : `All ${demo.required} are done.`} We are reviewing now and will be in touch.
                 </p>
               )}
             </div>

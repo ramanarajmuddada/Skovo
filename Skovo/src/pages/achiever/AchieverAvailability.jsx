@@ -5,9 +5,8 @@ import FormSelect from '../../components/ui/FormSelect';
 import StatTile from '../../components/admin/StatTile';
 import { Tabs } from '../../components/admin/v1/AdminV1Kit';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import {
-  Clock, Plus, Trash2, X, Loader2, Check, AlertTriangle, Sparkles, CalendarDays, Repeat,
+  Clock, Plus, Trash2, X, Loader2, Check, AlertTriangle, CalendarDays, Repeat,
   Pencil, IndianRupee, BookOpen, Pause, Play, CalendarOff, CalendarPlus,
 } from 'lucide-react';
 import { achieverApi } from '../../services/api';
@@ -15,6 +14,7 @@ import { Skeleton, ErrorState, EmptyState, useToast } from '../../components/ui/
 import { ConfirmModal } from '../../components/ui/TableComponents';
 import * as schema from '../../schemas/achiever';
 import { fieldErrors } from '../../schemas/achiever';
+import { offeringStatus } from '../../utils/offeringStatus';
 
 /**
  * Availability — 1-on-1s the Calendly way.
@@ -212,7 +212,7 @@ function OfferingModal({ initial, canCharge, onClose, onSaved, ranges = [], onGo
               <label className="block text-xs font-semibold text-slate-600 mb-1">Price (₹) {canCharge && <span className="text-red-500">*</span>}</label>
               {canCharge
                 ? <input type="number" min="0" value={f.price} onChange={(e) => set('price', e.target.value)} placeholder="e.g. 299 (0 = free)" className={inputCls} />
-                : <p className="text-xs text-slate-500 rounded-xl bg-slate-50 border border-slate-200 px-3 py-3">Free demo while you are on probation.</p>}
+                : <p className="text-xs text-slate-500 rounded-xl bg-slate-50 border border-slate-200 px-3 py-3">Paid sessions open once your account is verified.</p>}
             </div>
           </div>
           {canCharge && Number(f.price) > 0 && (
@@ -326,6 +326,9 @@ function OfferingsTab({ onChanged, ranges, onGoHours }) {
   const [edit, setEdit] = useState(null);       // null | 'new' | offering
   const [confirm, setConfirm] = useState(null);
   const toast = useToast();
+  // Re-draw every minute so "Upcoming" turns into "Live now" without a reload.
+  const [, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 60000); return () => clearInterval(t); }, []);
 
   const load = useCallback(() => {
     setLoading(true); setFailed(false);
@@ -393,9 +396,15 @@ function OfferingsTab({ onChanged, ranges, onGoHours }) {
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
           {rows.map((o) => {
-            const state = o.expired ? ['Ended', 'bg-slate-100 text-slate-500 border-slate-200']
-              : o.status === 'paused' ? ['Paused', 'bg-amber-50 text-amber-700 border-amber-200']
-                : ['Live', 'bg-emerald-50 text-emerald-700 border-emerald-200'];
+            const st = offeringStatus(o, ranges);
+            const state = {
+              ended: ['Ended', 'bg-slate-100 text-slate-500 border-slate-200'],
+              paused: ['Paused', 'bg-amber-50 text-amber-700 border-amber-200'],
+              published: ['Published', 'bg-blue-50 text-blue-700 border-blue-200'],
+              upcoming: ['Upcoming', 'bg-blue-50 text-blue-700 border-blue-200'],
+              live: ['Live now', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+              nohours: ['No hours', 'bg-amber-50 text-amber-700 border-amber-200'],
+            }[st.kind];
             const off = o.offer_type && Number(o.final_price) < Number(o.price);
             return (
               <div key={o.id} className={`bg-white rounded-2xl border border-slate-200 p-4 flex flex-col ${o.status === 'paused' || o.expired ? 'opacity-75' : ''}`}>
@@ -407,6 +416,14 @@ function OfferingsTab({ onChanged, ranges, onGoHours }) {
                   {lenLabel(o.duration_min)} · {o.days_label}
                   {o.available_to ? ` · till ${dayLabel(o.available_to)}` : ''}
                 </p>
+                {st.kind === 'upcoming' && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    Next: {st.today ? 'today' : dayLabel(st.date)}, {fmt(`${String(Math.floor(st.startMin / 60)).padStart(2, '0')}:${String(st.startMin % 60).padStart(2, '0')}`)} IST
+                  </p>
+                )}
+                {st.kind === 'nohours' && (
+                  <p className="text-xs text-amber-700 mt-1">No matching hours in the next 4 weeks. Add them under My hours.</p>
+                )}
                 {o.about && <p className="text-xs text-slate-600 mt-2 line-clamp-2">{o.about}</p>}
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 mt-auto">
                   <span className="text-sm font-bold text-slate-900">
@@ -610,10 +627,6 @@ function DateChanges({ onChanged }) {
 
 /* ═══ Page ═════════════════════════════════════════════════════════════════ */
 export default function AchieverAvailability() {
-  const { lifecycle } = useOutletContext() || {};
-  const onProbation = lifecycle?.isProbation;
-  const demosDone = lifecycle?.demo?.completed ?? 0;
-  const demosNeeded = lifecycle?.demo?.required ?? 3;
   const [tab, setTab] = useState('offerings');
   const [ranges, setRanges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -664,30 +677,15 @@ export default function AchieverAvailability() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatTile label="1-on-1s" icon={BookOpen} tone="blue" value={sum ? sum.offerings : '—'}
-                  sub={sum ? `live · ${+Number(sum.weekly_hours || 0).toFixed(2)} hrs a week` : 'live'}
+                  sub={sum ? `published · ${+Number(sum.weekly_hours || 0).toFixed(2)} hrs a week` : 'published'}
                   onClick={() => setTab('offerings')} active={tab === 'offerings'} />
         <StatTile label="Booked" icon={Check} tone="violet" value={sum ? sum.booked : '—'} sub="upcoming sessions" />
         <StatTile label="Next session" icon={Clock} tone="amber"
                   value={nextWhen ? nextWhen.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : 'None'}
                   sub={nextWhen ? nextWhen.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : 'no bookings yet'} />
-        {onProbation
-          ? <StatTile label="Demos" icon={Sparkles} tone="emerald" value={`${demosDone}/${demosNeeded}`}
-                      sub={demosDone < demosNeeded ? `${demosNeeded - demosDone} to go` : 'in review'} />
-          : <StatTile label="Expected earnings" icon={IndianRupee} tone="emerald" value={sum ? money(sum.earnings) : '—'}
-                      sub={sum && sum.commission_rate != null ? `after ${+(sum.commission_rate * 100).toFixed(2)}% SKOVO fee` : 'after SKOVO fee'} />}
+        <StatTile label="Expected earnings" icon={IndianRupee} tone="emerald" value={sum ? money(sum.earnings) : '—'}
+                      sub={sum && sum.commission_rate != null ? `after ${+(sum.commission_rate * 100).toFixed(2)}% SKOVO fee` : 'after SKOVO fee'} />
       </div>
-
-      {onProbation && (
-        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-800 leading-relaxed">
-              While you are on probation, every 1-on-1 is a <strong>free demo</strong>. Each one gets a rating and
-              written feedback, and we read those before you can start charging.
-            </p>
-          </div>
-        </div>
-      )}
 
       <Tabs active={tab} onChange={setTab} className="mb-4" tabs={[
         { key: 'offerings', label: 'My 1-on-1s', icon: BookOpen },

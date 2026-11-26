@@ -176,7 +176,6 @@ def _cohort_dict(c, achiever=None, domain=None, held_seats=0):
         'status': effective_cohort_status(types.SimpleNamespace(
             status=c.get('status'), session_date=c.get('session_date'), duration_minutes=c.get('duration_minutes'),
         )),
-        'is_demo': bool(c.get('is_demo')),
         'late_join_minutes': int(c.get('late_join_minutes') or 0),
         # Live, inside the achiever's late-join window: a free seat can still be taken.
         'late_join_open': bool(c.get('late_join_minutes') and c.get('session_date')

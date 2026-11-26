@@ -19,7 +19,7 @@ MIN_SLOT_MIN, MAX_SLOT_MIN = 15, 180
 
 def _price_offer(data, can_charge):
     """(price, offer_type, offer_value, offer_ends_at, error) from a form.
-    Price per slot like cohorts; on probation everything is free."""
+    Price per slot like cohorts."""
     from decimal import Decimal, InvalidOperation
     if not can_charge:
         return 0, None, None, None, None
@@ -291,7 +291,7 @@ def _require_can_publish():
 class MySessionRate(Resource):
     @jwt_required()
     def put(self):
-        """Set 1-on-1 session rate. Probation cannot charge — rate stays 0."""
+        """Set 1-on-1 session rate. Only a verified achiever may charge."""
         try:
             guard = _require_mentor()
             if guard:
@@ -308,7 +308,7 @@ class MySessionRate(Resource):
             if not caps.get('can_charge'):
                 if rate > 0:
                     return jsonify(response={
-                        'message': 'Charging opens after an admin reviews your demo sessions.',
+                        'message': 'Charging opens once an admin has verified your account.',
                     }, status=400, bool=False)
                 rate = 0
             # v1: SKOVO's cancellation rules for every achiever; no per-achiever choice.

@@ -57,8 +57,8 @@ def refused(d, *, naming=None):
 
 @pytest.fixture
 def world(app, db):
-    ids = {k: str(uuid.uuid4()) for k in ('active', 'probation', 'other', 'student')}
-    for key, state in (('active', 'active'), ('probation', 'probation'), ('other', 'active')):
+    ids = {k: str(uuid.uuid4()) for k in ('active', 'pending', 'other', 'student')}
+    for key, state in (('active', 'active'), ('pending', 'pending'), ('other', 'active')):
         db.session.execute(text("""
             INSERT INTO achievers (id, full_name, email, state, status, is_active,
                                    is_verified, created_at, updated_at)
@@ -106,7 +106,7 @@ def world(app, db):
     ids['cohort'] = cohort
     yield ids
 
-    aids = (ids['active'], ids['probation'], ids['other'])
+    aids = (ids['active'], ids['pending'], ids['other'])
     for sql, params in [
         ('DELETE FROM achiever_reviews WHERE user_id = :u', {'u': ids['student']}),
         ('DELETE FROM cohort_attendance_codes WHERE cohort_id IN '
@@ -162,16 +162,13 @@ def create(client, tok, world):
 # ── Creation, price and the charge gate ──────────────────────────────────────
 
 @pytest.mark.case('AC02-001')
-def test_a_probation_achiever_can_create_a_free_cohort(create):
-    """The `price > 0` floor made both branches refuse: any price needed
-    can_charge (active only) and 0 was rejected outright — so probation was
-    unusable on the one screen its dashboard points at."""
-    assert create('probation', price=0)[0] == 201
+def test_a_pending_achiever_cannot_create_a_free_cohort(create):
+    refused(create('pending', price=0)[1])
 
 
 @pytest.mark.case('AC02-002')
 def test_a_blank_price_means_free(create, db):
-    code, d = create('probation', price='')
+    code, d = create('active', price='')
     assert code == 201, d
     assert int(db.session.execute(text('SELECT price FROM cohorts WHERE id = :i'),
                                   {'i': d['response']['cohort_id']}).scalar() or 0) == 0
@@ -183,11 +180,8 @@ def test_a_negative_price_is_refused(create):
 
 
 @pytest.mark.case('AC02-004')
-def test_a_probation_achiever_cannot_create_a_paid_cohort(create):
-    code, d = create('probation', price=499)
-    refused(d)
-    assert 'charg' in str(d['response'].get('message', '')).lower() \
-        or 'active' in str(d['response'].get('message', '')).lower(), d
+def test_a_pending_achiever_cannot_create_a_paid_cohort(create):
+    refused(create('pending', price=499)[1])
 
 
 @pytest.mark.case('AC02-005')
@@ -338,13 +332,13 @@ def test_commission_is_resolved_from_the_rules_table():
 # ── Editing ──────────────────────────────────────────────────────────────────
 
 @pytest.mark.case('AC02-018')
-def test_probation_cannot_edit_a_free_cohort_into_a_paid_one(client, tok, world):
-    """PUT runs the same charge gate as POST. Without it, probation creates a
-    free cohort and immediately edits it to paid — the gate on the way in only."""
-    cid = world['cohort']('probation', state='upcoming', price=0, enrol=False)
+def test_a_pending_achiever_cannot_edit_a_free_cohort_into_a_paid_one(client, tok, world):
+    """PUT runs the same charge gate as POST. Without it, an unverified account with a
+    free cohort could edit it to paid."""
+    cid = world['cohort']('pending', state='upcoming', price=0, enrol=False)
     d = body(client.put(f'{ACHIEVER}/cohorts/{cid}',
                         json={'title': 'AC02 now paid', 'price': 999},
-                        headers=tok(world['probation'])))
+                        headers=tok(world['pending'])))
     refused(d)
 
 

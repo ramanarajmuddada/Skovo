@@ -16,14 +16,14 @@ The ladder replaces it:
     L4 featured     founder promotion. Raised ceiling, homepage placement.
 
 Capability is not config in a tier table any more. It follows the achiever's
-lifecycle state — pending, probation, active, suspended, banned — and
+lifecycle state — pending, active, suspended, banned — and
 sp_achiever_capabilities derives it in one place.
 
 Usage in a route:
 
     from portal.helpers import trust as T
     err = T.require_state(achiever_id, 'can_charge',
-                          'Charging opens once an admin reviews your demos.')
+                          'Charging opens once an admin has verified your account.')
     if err:
         return err          # a ready-made 403 response
 
@@ -180,8 +180,8 @@ def clamp_rate(achiever_id, requested, trust=None):   # noqa: ARG001 - trust kep
     achiever setting a price would have been silently clamped to zero.
 
     There is no ceiling any more. An admin sets the rate when they move someone
-    to active, having read that person's demo reviews; a number a human already
-    approved does not need a second, blunter limit on top.
+    to active; an achiever a human already verified does not need a second,
+    blunter limit on top.
 
     Returns (rate, note). `note` is None when the rate went through untouched,
     otherwise an explanation the caller shows — silently rewriting someone's
@@ -198,7 +198,7 @@ def clamp_rate(achiever_id, requested, trust=None):   # noqa: ARG001 - trust kep
     if not caps:
         return 0.0, 'We could not verify your account status, so your rate was left at 0.'
     if not caps.get('can_charge'):
-        return 0.0, ('Paid sessions open after an admin reviews your demo sessions. '
+        return 0.0, ('Paid sessions open once an admin has verified your account. '
                      'Your rate has been kept at 0 for now.')
     return rate, None
 
@@ -234,8 +234,7 @@ BOOKING_DENIED = {
     'parental_consent_pending': (
         'We need a parent or guardian to confirm your account before you can '
         'book a session. Check the email we sent them.'),
-    # A probation achiever runs free demo sessions only.
-    'achiever_cannot_charge': 'This achiever is running free demo sessions right now.',
+    'achiever_cannot_charge': 'This achiever cannot take paid bookings yet.',
     'eligibility_check_failed': 'We could not verify this booking. Please try again.',
 }
 
@@ -252,10 +251,8 @@ def public_badge(row):
     disappeared from every card on the platform.
 
     Now it says the two things a student actually benefits from knowing: that a
-    human reviewed this person's documents and demo sessions (`active`), and
-    separately that a background check came back clear. Probation deliberately
-    earns no badge — those achievers are running free demos precisely because
-    nobody has vouched for them yet.
+    human reviewed this person's documents (`active`), and separately that a
+    background check came back clear.
     """
     if (row.get('bgv_status') or '') == 'clear':
         return 'background_verified'
@@ -266,10 +263,10 @@ def public_badge(row):
 
 # ── Lifecycle capabilities ───────────────────────────────────────────────────
 # These replace the tier guards above. Capability now follows the achiever's
-# state — pending / probation / active / suspended / banned — which is the
+# state — pending / active / suspended / banned — which is the
 # model the platform actually runs on. The tier table decided this before, and
 # two systems answering the same question is how an achiever ends up able to
-# charge while still on probation.
+# charge before being verified.
 
 def lifecycle_caps(achiever_id):
     """The achiever's state and what it permits, or None when not found."""

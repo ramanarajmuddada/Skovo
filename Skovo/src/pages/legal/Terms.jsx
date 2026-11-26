@@ -84,8 +84,8 @@ export default function Terms() {
 
       <h2>7. Achiever verification</h2>
       <p>
-        Achievers undergo a verification process, including document checks and
-        demonstration sessions, before they can charge for their services.
+        Achievers undergo a verification process, including document checks,
+        before they can charge for their services.
         Verification reduces risk but is not a warranty; you should use your own
         judgement when engaging an Achiever.
       </p>

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import DateTimePicker from '../../components/ui/DateTimePicker';
 import { adminApi as api } from '../../services/api';
-import { SeatAllocationField, DemoTargetField, MIN_SEATS, MAX_SEATS } from './AchieverControls';
+import { SeatAllocationField, MIN_SEATS, MAX_SEATS } from './AchieverControls';
 
 /**
  * The achiever's controls, on the achiever's own screen.
  *
  * These lived only on Achiever Review, which meant every routine change —
- * "cap his cohorts at 5", "13 demos was a mistake", "his reviews have gone bad,
- * put him back on demos" — started by leaving the Achievers directory and
+ * "cap their cohorts at 5", "suspend them for a week" — started by leaving the Achievers directory and
  * finding the person again in a different queue. The endpoints are the same
  * ones Achiever Review calls; nothing new is possible here, it is just possible
  * in the place you were already standing.
@@ -24,8 +23,7 @@ import { SeatAllocationField, DemoTargetField, MIN_SEATS, MAX_SEATS } from './Ac
 const BASE = '/skovo-platform-panel-admin/achiever-lifecycle';
 
 // What each state may have done to it. Mirrors the guards on Achiever Review
-// rather than re-deciding them: a pending applicant has no cohorts to cap and
-// no demos to set, and a banned account has nothing to configure until the ban
+// rather than re-deciding them: a pending applicant has no cohorts to cap, and a banned account has nothing to configure until the ban
 // is lifted.
 //
 // Two notes here were stale and have been corrected. One said `seats` was false
@@ -34,13 +32,11 @@ const BASE = '/skovo-platform-panel-admin/achiever-lifecycle';
 // always reflected. The other said banned was terminal, which stopped being
 // true when unban was added.
 const CAN = {
-  // `demos` is gone from this table: the control lives on the Demos tab now.
   pending:   { seats: false, suspend: true,  ban: true,  lift: false },
-  probation: { seats: true,  suspend: true,  ban: true,  lift: false },
   active:    { seats: true,  suspend: true,  ban: true,  lift: false },
   suspended: { seats: true,  suspend: false, ban: true,  lift: true },
-  // `unban` is the way out. Every other control stays off: seats and demo
-  // targets on a banned account are decisions about someone who is not on
+  // `unban` is the way out. Every other control stays off: seats on a
+  // banned account are decisions about someone who is not on
   // the platform, and they are all still there the moment the ban lifts.
   banned:    { seats: false, suspend: false, ban: false, lift: false,
                unban: true },
@@ -190,16 +186,8 @@ export default function AchieverManageTab({ achiever, record, onDone, onToast })
         </Section>
       )}
 
-      {/* The demo target moved to the Demos tab.
-          
-          Reading how many demos someone has done and changing how many they
-          owe were two different tabs, and the numbers this control acts on are
-          all on the other one. It does the same two jobs there: raise or lower
-          the target for someone on probation, or send an active achiever back
-          to demos when their reviews say they should prove it again. */}
       {/* Lifting a suspension early. Restored after I removed it by accident:
-          the deletion that moved the demo control to the Demos tab spanned this
-          section too, which sat between them. Without it a suspended achiever
+          a deletion spanned this section too. Without it a suspended achiever
           could only wait for the date to pass. */}
       {can.lift && (
         <Section title="Suspension" hint={record?.state_reason || 'Currently suspended.'}>
@@ -214,8 +202,8 @@ export default function AchieverManageTab({ achiever, record, onDone, onToast })
         <Section title="Ban"
                  hint={record?.state_reason || 'This account is closed.'}>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Lifting it returns them to where the ban found them — their documents,
-            seat cap and demo target are untouched.
+            Lifting it returns them to where the ban found them — their documents
+            and seat cap are untouched.
           </p>
           <button type="button" onClick={doUnban} disabled={busy}
                   className={`${btn} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
@@ -281,8 +269,8 @@ export default function AchieverManageTab({ achiever, record, onDone, onToast })
           className="w-full min-w-0 min-h-11 border border-slate-200 rounded-xl px-3 py-2.5 text-sm
                      focus:outline-none focus:ring-2 focus:ring-blue-300" />
         <p className="text-[11px] text-slate-400 mt-1">
-          Required for suspending, banning, lifting either, and changing the demo
-          target — recorded against the achiever and shown to them. Seat changes
+          Required for suspending, banning and lifting either — recorded against
+          the achiever and shown to them. Seat changes
           do not take one: the procedure behind them records no reason, and a
           field whose value is thrown away is worse than no field.
         </p>

@@ -86,7 +86,7 @@ END$$
 -- A stable code is SKV- (student) or SKA- (achiever) plus the start of the
 -- account id. Links shared before the codes grew carry 8 characters; new ones
 -- carry 13. A prefix that matches two accounts pays neither. An achiever's
--- link works once they are approved (probation or active), not while pending.
+-- link works once they are approved (active), not while pending.
 DROP PROCEDURE IF EXISTS `sp_referral_find_referrer`$$
 CREATE PROCEDURE `sp_referral_find_referrer`(IN p_code VARCHAR(40))
 proc: BEGIN
@@ -114,13 +114,13 @@ proc: BEGIN
     ELSEIF LEFT(v_code, 4) = 'SKA-' AND CHAR_LENGTH(v_tail) >= 8 THEN
         SELECT COUNT(*) INTO v_hits
           FROM `achievers` a
-         WHERE IFNULL(a.is_active, 1) = 1 AND a.state IN ('probation', 'active')
+         WHERE IFNULL(a.is_active, 1) = 1 AND a.state = 'active'
            AND UPPER(LEFT(a.id, CHAR_LENGTH(v_tail))) = v_tail;
         IF v_hits = 1 THEN
             SELECT a.id AS referrer_id, a.email AS referrer_email,
                    'achiever' AS referrer_audience, 'stable' AS source
               FROM `achievers` a
-             WHERE IFNULL(a.is_active, 1) = 1 AND a.state IN ('probation', 'active')
+             WHERE IFNULL(a.is_active, 1) = 1 AND a.state = 'active'
                AND UPPER(LEFT(a.id, CHAR_LENGTH(v_tail))) = v_tail
              LIMIT 1;
             LEAVE proc;
@@ -136,7 +136,7 @@ proc: BEGIN
             AND IFNULL(r.referrer_audience, 'student') = 'student'
       LEFT JOIN `achievers` a
              ON a.id = r.referrer_id AND IFNULL(a.is_active, 1) = 1
-            AND a.state IN ('probation', 'active')
+            AND a.state = 'active'
             AND r.referrer_audience = 'achiever'
      WHERE r.referral_code = v_code
        AND (u.id IS NOT NULL OR a.id IS NOT NULL)

@@ -159,10 +159,6 @@ def _browse_row(a):
         'rating':            float(a.get('rating') or 0),
         'review_count':      int(a.get('review_count') or 0),
         'session_rate':      float(a.get('session_rate') or 0),
-        # A probation achiever teaches free until an admin has read their three
-        # demo reviews. The card has to say so, or a ₹0 price reads as a bug
-        # rather than a deliberate trial.
-        'is_demo_achiever':  a.get('state') == 'probation',
         'standing':          a.get('standing') or 'new',
     }
 
@@ -289,7 +285,7 @@ def achiever_slugs():
     achievers share a name ('pavan-kumar-0c8b'). Built from names, so nothing
     new is stored. {achiever_id: slug}."""
     rows = db.session.execute(text(
-        "SELECT id, full_name FROM achievers WHERE state IN ('active', 'probation') ORDER BY created_at"
+        "SELECT id, full_name FROM achievers WHERE state = 'active' ORDER BY created_at"
     )).fetchall()
     seen, out = {}, {}
     for aid, name in rows:
@@ -1009,22 +1005,6 @@ class AchieverPortalBookingDetail(Resource):
                 call_proc_one('sp_session_mark_ended', session_id)
             db.session.commit()
 
-            # A completed demo moves the achiever toward their three. Counted
-            # from the sessions table by the procedure rather than incremented
-            # here, so a double PATCH cannot inflate the total.
-            if new_status == 'completed' and s.get('is_demo'):
-                try:
-                    # ── SP: sp_achiever_demo_complete ───────────────────────
-                    d = call_proc_one('sp_achiever_demo_complete', achiever_id) or {}
-                    db.session.commit()
-                    if d.get('ready_for_review'):
-                        logger.info(
-                            "achiever %s completed %s demo sessions - awaiting admin review",
-                            achiever_id, d.get('demos_done'))
-                except Exception as de:
-                    db.session.rollback()
-                    logger.error("demo count failed for %s: %s", achiever_id, de)
-
             if new_status == 'cancelled':
                 # Releasing a cancelled session frees its slot so it can be booked again.
                 # ── SP: sp_achiever_slots_list, sp_achiever_slots_update ────────────
@@ -1563,7 +1543,6 @@ class AchieverPortalCohorts(Resource):
                     # Price and offer are fixed once anyone has booked (see PUT).
                     'price_locked': int(c.get('filled_seats') or 0) > 0,
                     'price': c.get('price'),
-                    'is_demo': bool(c.get('is_demo')),
                     'offer_price': c.get('offer_price'),
                     'offer_percent': c.get('offer_percent'),
                     'offer_label': c.get('offer_label'),
@@ -1600,14 +1579,10 @@ class AchieverPortalCohorts(Resource):
                 return jsonify(response={'message': 'Achiever access only.'}, status=403, bool=False)
             achiever_id = get_jwt_identity()
             # ── Lifecycle gate ───────────────────────────────────────────────
-            # Creating a cohort needs an approved account (probation or
-            # active). Charging for one needs `active` — checked below, once
-            # the price is known, so a probation achiever can start running
-            # free demo sessions the day they are approved rather than waiting
-            # on review with nothing to do. That is the point of probation.
+            # Only a verified (active) achiever may create a cohort.
             err = T.require_state(
                 achiever_id, 'can_take_bookings',
-                'Your account is not approved for sessions yet.')
+                'Your account must be verified by an admin before you can create cohorts.')
             if err:
                 return err
             # Paused (too many strikes): no new classes until an admin reviews.
@@ -1621,14 +1596,7 @@ class AchieverPortalCohorts(Resource):
             if not title:
                 return jsonify(response={'message': 'Title is required.'}, status=400, bool=False)
 
-            # 0 is a free cohort, not a missing price. The `> 0` floor that used
-            # to be here made the `can_charge` check below unreachable and
-            # probation unusable: every cohort had to be paid, every paid cohort
-            # needs `active`, so a probation achiever was refused whatever they
-            # typed — on the one screen their own dashboard tells them to use to
-            # run three free demo sessions. Blank still means free, because the
-            # field is the only thing standing between approval and a first
-            # session and an empty box is not an error worth a round trip.
+            # 0 is a free cohort, not a missing price. Blank means free.
             price = data.get('price')
             try:
                 price = int(price if price not in (None, '') else 0)
@@ -1641,8 +1609,7 @@ class AchieverPortalCohorts(Resource):
             if price > 0:
                 err = T.require_state(
                     achiever_id, 'can_charge',
-                    'You can run free sessions while on probation. Charging opens once '
-                    'an admin reviews your demo sessions.')
+                    'Paid cohorts open once an admin has verified your account.')
                 if err:
                     return err
 
@@ -1717,12 +1684,6 @@ class AchieverPortalCohorts(Resource):
             if late is not None:
                 db.session.execute(text("UPDATE cohorts SET late_join_minutes = :m WHERE id = :i"),
                                    {'m': late, 'i': cohort['id']})
-            # A free class made while on probation is a demo; fixed at creation,
-            # so a free class after approval never counts toward the demo target.
-            db.session.execute(text(
-                "UPDATE cohorts c JOIN achievers a ON a.id = c.achiever_id "
-                "SET c.is_demo = (a.state = 'probation' AND IFNULL(c.price, 0) = 0) WHERE c.id = :i"
-            ), {'i': cohort['id']})
             _apply_offer(cohort['id'], achiever_id, offer_args)
             db.session.commit()
 
@@ -1775,7 +1736,7 @@ class AchieverCoupons(Resource):
                 return jsonify(response={'message': 'Achiever access only.'}, status=403, bool=False)
             achiever_id = get_jwt_identity()
             # Coupons are `active`-only in SCREENS, and until now that was
-            # enforced by the sidebar alone -- a pending, probation, suspended or
+            # enforced by the sidebar alone -- a pending, suspended or
             # banned achiever could mint discount codes straight through the API,
             # and sp_student_coupon_validate honours them at checkout. AC01-009.
             err = T.require_screen(
@@ -2159,28 +2120,6 @@ class AchieverPortalCohortEnd(Resource):
             # Tasks set before or during the class open now: tell who attended.
             _open_tasks_now(call_proc_one('sp_cohorts_get', cohort_id) or existing)
 
-            # Ending a free cohort is how a probation achiever completes a demo
-            # — they cannot charge, so a cohort is the only demo they can run.
-            # The counter was only ever refreshed when a 1-on-1 session was
-            # completed, so a cohort demo moved nothing and probation was a
-            # dead end. Widening the SP alone would not have fixed it: nothing
-            # recomputed the count at the moment a cohort ended.
-            #
-            # Swallowed like the session path above: the class HAS ended and
-            # that commit already stands. A failure here must not turn a
-            # successful End into an error the achiever sees, and the next call
-            # recounts from rows anyway.
-            try:
-                d = call_proc_one('sp_achiever_demo_complete', achiever_id) or {}
-                db.session.commit()
-                if d.get('ready_for_review'):
-                    logger.info(
-                        "achiever %s completed %s demos (cohort) - awaiting admin review",
-                        achiever_id, d.get('demos_done'))
-            except Exception as de:
-                db.session.rollback()
-                logger.error("demo recount after cohort end failed for %s: %s", achiever_id, de)
-
             # Ask everyone who attended to rate it while it is fresh; a reminder
             # follows the next day for anyone who has not (jobs_v1.review_reminder).
             try:
@@ -2291,15 +2230,11 @@ class AchieverPortalCohortDetail(Resource):
                     return jsonify(response={'message': 'Price must be a whole number of rupees.'}, status=400, bool=False)
                 if p < 0:
                     return jsonify(response={'message': 'Price cannot be negative.'}, status=400, bool=False)
-                # The gate POST has, which this route was missing entirely.
-                # Without it, a probation achiever could create a free cohort
-                # and immediately edit it to a paid one — the charging rule
-                # enforced on the way in and not on the way past.
+                # The same gate POST has, so an edit cannot sidestep it.
                 if p > 0 and int(existing.get('price') or 0) != p:
                     err = T.require_state(
                         achiever_id, 'can_charge',
-                        'You can run free sessions while on probation. Charging opens once '
-                        'an admin reviews your demo sessions.')
+                        'Paid cohorts open once an admin has verified your account.')
                     if err:
                         return err
                 update_data['price'] = p
@@ -2581,10 +2516,6 @@ class AchieverPortalCohortFeedback(Resource):
                 # is incremented only in sp_payment_cohort_mark_paid — paid
                 # students — so on a free cohort it is 0, and the response rate
                 # became "3 out of 0": a division by zero, or a rate over 100%.
-                # Probation achievers run free demo sessions almost exclusively,
-                # and these are the same ratings an admin reads to decide
-                # whether they may start charging, so the denominator was
-                # broken exactly where the number matters most. AC02-044.
                 'enrolled_count': sum(
                     1 for e in call_proc('sp_cohort_enrolled_students', cohort_id) or []
                 ),
@@ -3206,10 +3137,7 @@ class AchieverPortalTasks(Resource):
             if get_jwt().get('role') != 'mentor':
                 return jsonify(response={'message': 'Achiever access only.'}, status=403, bool=False)
             achiever_id = get_jwt_identity()
-            # The same gate creating a cohort passes: an approved account, on
-            # probation or active. Deliberately not `can_charge` — setting
-            # homework is not charging for it, and a probation achiever running
-            # free demo sessions needs to be able to follow them up.
+            # The same gate creating a cohort passes: a verified account.
             err = T.require_state(achiever_id, 'can_take_bookings',
                                   'Your account is not approved for sessions yet.')
             if err:
@@ -3904,24 +3832,13 @@ class BookAchieverSession(Resource):
 
             rate = float(achiever.get('session_rate') or 0)
 
-            # An achiever's lifecycle state decides whether this booking can
-            # cost anything at all. Reading session_rate alone would let a
-            # probation achiever charge the moment an admin set a rate, and let
-            # a suspended one keep taking bookings.
+            # Only a verified, active achiever takes bookings.
             # ── SP: sp_achiever_capabilities ────────────────────────────────
             caps = call_proc_one('sp_achiever_capabilities', achiever_id) or {}
             if not caps.get('can_take_bookings'):
                 return jsonify(response={
                     'message': 'This achiever is not accepting bookings right now.',
                 }, status=409, bool=False)
-
-            is_demo = bool(caps.get('demo_only'))
-            if is_demo:
-                # Probation: three free sessions, reviewed by real students,
-                # before any money changes hands. Forcing the rate to zero here
-                # rather than trusting the caller means a crafted request cannot
-                # buy its way past probation.
-                rate = 0.0
 
             # Lock the slot row so two students can't grab the same slot concurrently
             # (the check-then-update below must be atomic). No internal transaction on
@@ -3938,15 +3855,15 @@ class BookAchieverSession(Resource):
                     return jsonify(response={'message': _err}, status=409, bool=False)
             # ── SP: sp_achiever_slots_lock_available ────────────────────────────
             slot = call_proc_one('sp_achiever_slots_lock_available', slot_id, achiever_id)
-            # Price per slot (like cohorts), less a live offer; probation stays free.
-            # The 1-on-1's own price decides the charge (session_rate is the old
-            # profile-wide rate and is often empty). Probation stays free.
+            # Price per slot (like cohorts), less a live offer. The 1-on-1's own
+            # price decides the charge (session_rate is the old profile-wide rate
+            # and is often empty).
             if slot:
                 from portal.routes.AchieverAvailability.achiever_availability import slot_final_price
                 _row = db.session.execute(text(
                     "SELECT price, offer_type, offer_value, offer_ends_at, start_utc FROM achiever_slots WHERE id = :i"),
                     {'i': slot_id}).mappings().first() or {}
-                if _row.get('price') is not None and not is_demo:
+                if _row.get('price') is not None:
                     rate = float(slot_final_price(_row, rate)[1])
                 _cut = int(CR.rules().get('booking_cutoff_min') if CR.rules().get('booking_cutoff_min') is not None else 10)
                 if _row.get('start_utc') and _row['start_utc'] < datetime.datetime.utcnow() + datetime.timedelta(minutes=_cut):
@@ -4074,8 +3991,6 @@ class BookAchieverSession(Resource):
                 }, status=200, bool=True)
 
             # ── Free flow (free achiever OR a 100%-off coupon) ───────────────
-            # A probation booking is recorded as a demo so it is excluded from
-            # earnings and standing, and counted toward the three required.
             # ── SP: sp_student_session_book — locks the seat, checks
             # availability, inserts the session, updates the slot — atomically. ─
             result = call_proc_one(
@@ -4090,16 +4005,6 @@ class BookAchieverSession(Resource):
                 return jsonify(response={'message': message}, status=400, bool=False)
 
             session_id = result.get('session_id')
-
-            # Flag it as a probation demo. Set after the booking rather than
-            # inside sp_student_session_book so that procedure's signature —
-            # and every other caller of it — stays untouched.
-            if is_demo and session_id:
-                db.session.execute(text(
-                    "UPDATE achiever_sessions SET is_demo = 1, updated_at = UTC_TIMESTAMP() "
-                    "WHERE id = :i"
-                ), {'i': session_id})
-                db.session.commit()
 
             # Notify achiever + track event
             try:

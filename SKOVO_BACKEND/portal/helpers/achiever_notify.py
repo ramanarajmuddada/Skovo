@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS
     Every admin decision in the achiever lifecycle -- approve, reject, send a
-    document back, ask for another one, clear a background check, change a demo
+    document back, ask for another one, clear a background check, change a seat
     target, suspend, ban, lift a ban, and the overnight job that lifts an
     expired suspension -- changed the database and told nobody. The achiever's
     own screen meanwhile promises, twice, "We will email you when there is a
@@ -82,7 +82,7 @@ def tell_achiever(achiever_id, title, body, *, email=True, type='system',
     """Write the in-app notification and, unless told otherwise, email it.
 
     `email=False` is for the changes that matter on screen but do not deserve an
-    inbox -- a demo target moving from 3 to 1, say. A suspension gets both.
+    inbox -- a seat cap changing, say. A suspension gets both.
 
     Every email carries a button. An achiever told their ID was rejected should
     not have to remember the URL, find the login, and navigate to the right

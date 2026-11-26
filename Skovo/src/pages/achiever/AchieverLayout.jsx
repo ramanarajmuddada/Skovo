@@ -512,7 +512,7 @@ export default function AchieverLayout() {
   // that looks empty and one that looks like it is checking.
   const holdForCheck  = lifecycle.loading && !allowed;
   // Where a blocked screen sends you. This was hardcoded to /application, which
-  // holds for pending, probation and suspended because verification is unlocked
+  // holds for pending and suspended because verification is unlocked
   // in all three. It is NOT unlocked for `banned`: the server lists only
   // dashboard and earnings. So a banned achiever opening any locked URL was
   // redirected to /application, which is itself blocked, which redirects to

@@ -23,7 +23,6 @@ const inr = n => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractio
 
 const QUEUE_ICON = {
   documents: FileText,
-  probation: ShieldCheck,
   payouts:   Wallet,
   refunds:   RotateCcw,
 };
@@ -199,7 +198,6 @@ export function HealthPanel({ health, totals, period = 'In this period' }) {
           <div className="-mx-2">
             {[
               { Icon: ShieldCheck, label: 'Active achievers',  value: totals.achievers_active, to: '/skovo-platform-panel-admin/achievers' },
-              { Icon: ShieldCheck, label: 'In probation',       value: totals.achievers_probation, to: '/skovo-platform-panel-admin/achievers' },
               { Icon: Users,       label: 'Students',           value: totals.students, to: '/skovo-platform-panel-admin/users' },
             ].map(r => (
               <Link key={r.label} to={r.to} className="flex items-center gap-2.5 min-h-10 px-2 rounded-lg hover:bg-slate-50">

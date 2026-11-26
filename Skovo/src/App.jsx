@@ -470,7 +470,7 @@ function App() {
             <Route path="opportunities"    element={<AdminOpportunities />} />
             <Route path="achievers"        element={<AdminAchievers />} />
             <Route path="achiever-guidelines" element={<AdminAchieverGuidelines />} />
-            {/* Replaces the trust-tier dropdown: applications and probation
+            {/* Replaces the trust-tier dropdown: applications and verification
                 decisions in one queue, driven by evidence rather than a level. */}
             <Route path="achiever-review"  element={<AdminAchieverLifecycle />} />
             <Route path="domains"          element={<AdminDomains />} />

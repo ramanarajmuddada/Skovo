@@ -625,24 +625,12 @@ def test_a_student_token_cannot_assign_tasks(client, rows, student_auth):
 
 
 def test_a_pending_achiever_cannot_assign_tasks(client, rows, assign):
-    """can_take_bookings is active|probation. A pending account has not been
+    """can_take_bookings is active only. A pending account has not been
     reviewed and has no session to follow up."""
     achiever = rows.achiever(state='pending')
     cohort = rows.cohort(achiever, starts_minutes_ago=10, status='live')
     code, d = assign(achiever, cohort, title='Not approved yet')
     assert d['status'] == 403
-
-
-def test_a_probation_achiever_can_assign_tasks(client, rows, assign, student_auth):
-    """Probation achievers run the free demo sessions, so they are exactly the
-    people who need to set follow-up work."""
-    achiever = rows.achiever(state='probation')
-    cohort = rows.cohort(achiever, starts_minutes_ago=10, status='live')
-    student = rows.student()
-    rows.enroll(student, cohort)
-
-    assert assign(achiever, cohort, title='Demo follow-up')[0] == 201
-    assert titles_of(client, student_auth(student)) == ['Demo follow-up']
 
 
 # ── the assignment is what actually landed in the database ───────────────────

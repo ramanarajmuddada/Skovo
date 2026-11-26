@@ -35,8 +35,6 @@ TEST_PREFIX = 'ac01-test-'
 # imports the map it is checking proves only that the map equals itself.
 EXPECTED_SCREENS = {
     'pending':   {'verification'},
-    'probation': {'dashboard', 'verification', 'profile', 'notifications',
-                  'availability', 'bookings', 'earnings', 'cohorts', 'tasks', 'referrals'},
     'active':    {'dashboard', 'verification', 'profile', 'notifications',
                   'availability', 'bookings', 'earnings', 'cohorts', 'tasks',
                   # 'courses' is v1-hidden in SCREENS.
@@ -115,7 +113,7 @@ def lifecycle(client, tok):
 
 @pytest.mark.case('AC01-001')
 def test_a_new_achiever_starts_pending(achiever_in, lifecycle):
-    """State, not tiers. The lifecycle is PENDING → PROBATION → ACTIVE ⇄
+    """State, not tiers. The lifecycle is PENDING → ACTIVE ⇄
     SUSPENDED → BANNED, and a new signup begins at the start of it."""
     d = lifecycle(achiever_in('pending'))
     assert d['status'] == 200, d
@@ -228,21 +226,20 @@ def test_a_locked_screen_is_locked_in_the_api_not_only_the_sidebar(client, tok, 
 
 
 @pytest.mark.case('AC01-013')
-def test_a_probation_achiever_carries_no_public_badge(achiever_in, db):
-    """Probation earns no badge deliberately: those achievers run free demos
-    precisely because nobody has vouched for them yet."""
+def test_a_pending_achiever_carries_no_public_badge(achiever_in, db):
+    """No badge until an admin has verified the account."""
     from portal.helpers.trust import public_badge
-    aid = achiever_in('probation')
+    aid = achiever_in('pending')
     row = db.session.execute(text(
         'SELECT state, bgv_status FROM achievers WHERE id = :i'), {'i': aid}).mappings().first()
     assert public_badge(dict(row)) in (None, '', 'none'), \
-        f'probation shows badge {public_badge(dict(row))!r}'
+        f'pending shows badge {public_badge(dict(row))!r}'
 
 
 @pytest.mark.case('AC01-014')
 def test_the_lifecycle_endpoint_returns_the_whole_picture(achiever_in, lifecycle):
     """A 404 here blanks the achiever portal — every screen reads this."""
-    d = lifecycle(achiever_in('probation'))
+    d = lifecycle(achiever_in('active'))
     assert d['status'] == 200, d
     for key in ('state', 'capabilities', 'screens'):
         assert key in d['response'], f'{key} missing: {sorted(d["response"])}'
@@ -464,17 +461,13 @@ def test_the_avatar_put_echoes_what_it_stored(client, tok, achiever_in):
         'the PUT does not echo the stored avatar back'
 
 
-# ── Probation deal ───────────────────────────────────────────────────────────
-
-@pytest.mark.case('AC01-035')
-@pytest.mark.case('AC01-036')
-def test_probation_can_take_bookings_but_not_charge(client, tok, achiever_in, lifecycle):
-    """The deal the dashboard states, asserted where it is enforced: run demo
-    sessions (can_take_bookings) without charging (can_charge is active-only)."""
-    caps = lifecycle(achiever_in('probation'))['response']['capabilities']
-    assert caps.get('can_take_bookings') is True, caps
-    assert caps.get('can_charge') is False, caps
-    assert caps.get('demo_only') is True, caps
+@pytest.mark.parametrize('state,allowed', [('active', True), ('pending', False),
+                                           ('suspended', False), ('banned', False)])
+def test_only_a_verified_achiever_can_book_and_charge(achiever_in, lifecycle, state, allowed):
+    caps = lifecycle(achiever_in(state))['response']['capabilities']
+    assert caps['can_take_bookings'] is allowed, caps
+    assert caps['can_charge'] is allowed, caps
+    assert 'demo_only' not in caps
 
 
 @pytest.mark.case('AC01-037')

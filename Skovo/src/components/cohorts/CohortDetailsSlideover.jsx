@@ -18,7 +18,7 @@ const paise = (n) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDig
  *  Shown to an enrolled student once the class has actually started — the same
  *  rule the server enforces, so the box never appears on something the API
  *  would then refuse. Rating a class nobody has attended is not feedback, and
- *  these ratings are what an admin reads to take an achiever off probation.
+ *  these ratings are what students and admins judge an achiever by.
  *
  *  Editable rather than one-shot. The API is update-or-insert on
  *  (achiever, user, context_type, context_id), so a second submit replaces the

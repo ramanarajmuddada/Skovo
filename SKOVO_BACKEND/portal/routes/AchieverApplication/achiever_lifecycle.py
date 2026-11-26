@@ -19,10 +19,7 @@ from portal.models import db
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.helpers.helpers import serialize_datetime
 from portal.helpers.error_capture import capture_error
-from portal.helpers import achiever_demo as D
 from . import ns, logger
-
-DEMOS_REQUIRED = D.DEFAULT_REQUIRED
 
 # Which portal screens are reachable in each state. The frontend renders locks
 # from this rather than keeping its own copy, so the two cannot disagree.
@@ -33,16 +30,7 @@ SCREENS = {
     # edited the same fields from somewhere else, which is how two screens
     # disagree about what was saved. It returns once they are approved.
     'pending':   ['verification'],
-    # Cohorts and Tasks are open on probation because the API already is:
-    # POST /achievers/portal/cohorts gates on `can_take_bookings`, which
-    # probation holds, and only *charging* needs `active`. Leaving the screens
-    # locked meant a freshly approved achiever was told to run three free demo
-    # sessions with no way to create one — the sidebar contradicted the very
-    # checklist on the dashboard. Tasks follows cohorts: homework for a session
-    # you ran is not a paid feature.
-    'probation': ['dashboard', 'verification', 'profile', 'notifications',
-                  'availability', 'bookings', 'earnings', 'cohorts', 'tasks', 'referrals'],
-      'active':    ['dashboard', 'verification', 'profile', 'notifications',
+    'active':    ['dashboard', 'verification', 'profile', 'notifications',
                   'availability', 'bookings', 'earnings', 'cohorts', 'tasks',
                   # v1-hidden: 'courses',
                   'domains', 'coupons', 'referrals'],
@@ -101,8 +89,7 @@ GUIDELINES = {
                     'Your exact rate is shown on the agreement you accept next.',
                     'Money for a booking is held until the session or cohort is delivered, then released '
                     'to your balance. You request a payout whenever you like and an admin approves it.',
-                    'Your session rate is set by an admin when you are approved, after they have read '
-                    'your demo reviews. It is not something you set yourself.',
+                    'Once an admin verifies your account you can create paid cohorts and set their price.',
                 ],
             },
             {
@@ -125,20 +112,6 @@ GUIDELINES = {
                 ],
             },
         ],
-    },
-    'probation': {
-        'title': 'You are approved — demo sessions to go',
-        'summary': 'Teach free sessions. Students review each one, and '
-                   'we read those reviews before you can start charging.',
-        'steps': [
-            'Set your availability so students can book you.',
-            'You are now listed publicly, marked "New — free demo session".',
-            'Teach the required number of sessions. They are free for the student and unpaid for you.',
-            'After each one the student leaves a rating and written feedback.',
-            'Once they are complete we review them and decide.',
-        ],
-        'note': 'Credentials tell us what you have done. These sessions tell us '
-                'how you teach — which is what students are actually paying for.',
     },
     'active': {
         'title': 'You are live',
@@ -184,7 +157,7 @@ GUIDELINES = {
             'Press End session when you finish (it opens a few minutes before the end). Your quiz then opens for students.',
             'After class, students take your quiz and leave a review. On paid classes, your earnings appear in Earnings after the complaint window.',
         ],
-        'note': 'On probation, a completed free class with at least one student counts as a demo.',
+        'note': None,
     },
 }
 
@@ -205,39 +178,9 @@ def stored_guidelines(state):
         return None
 
 
-def guidelines_for(state, required=None):
-    """Copy keyed on state, with the person's demo target filled in.
-
-    A hardcoded 'three' is wrong the moment HR asks for two more.
-    """
-    stored = stored_guidelines(state)
-    base = stored or GUIDELINES.get(state, GUIDELINES['pending'])
-    if state != 'probation':
-        return base
-    if stored:
-        # Admin copy for probation may say {sessions} ("3 demo sessions") or {n}.
-        n = int(required or D.DEFAULT_REQUIRED)
-        sess = f'{n} demo session' if n == 1 else f'{n} demo sessions'
-        fill = lambda v: v.replace('{sessions}', sess).replace('{n}', str(n)) if isinstance(v, str) else v
-        return {**stored, 'title': fill(stored.get('title')), 'summary': fill(stored.get('summary')),
-                'steps': [fill(x) for x in stored.get('steps') or []]}
-    n = int(required or D.DEFAULT_REQUIRED)
-    # "1 demo sessions to go" read as a typo; a target of one is common.
-    sess = f'{n} demo session' if n == 1 else f'{n} demo sessions'
-    return {
-        **base,
-        'title': f'You are approved — {sess} to go',
-        'summary': (f'Teach {sess} for free. Students review each one, and '
-                    'we read those reviews before you can start charging.'),
-        'steps': [
-            'Set your availability so students can book you.',
-            'You are now listed publicly, marked "New — free demo session".',
-            f'Teach {sess}. They are free for the student and unpaid for you.',
-            'After each one the student leaves a rating and written feedback.',
-            ('Once it is complete we review it and decide.' if n == 1
-             else f'Once all {n} are complete we review them and decide.'),
-        ],
-    }
+def guidelines_for(state):
+    """Copy keyed on state: the admin's version if saved, else the built-in."""
+    return stored_guidelines(state) or GUIDELINES.get(state, GUIDELINES['pending'])
 
 
 @ns.route('/lifecycle')
@@ -259,13 +202,9 @@ class AchieverLifecycle(Resource):
 
             row = db.session.execute(text(
                 "SELECT state_reason, suspended_until, standing, standing_score, "
-                "       demo_sessions_done, payout_ready, session_rate, "
-                "       IFNULL(demo_sessions_required, 3) "
+                "       payout_ready, session_rate "
                 "  FROM achievers WHERE id = :i"
             ), {'i': achiever_id}).fetchone()
-
-            done = int(row[4] or 0) if row else 0
-            needed = int(row[7] or D.DEFAULT_REQUIRED) if row else D.DEFAULT_REQUIRED
 
             return jsonify(response={
                 'state': state,
@@ -273,16 +212,15 @@ class AchieverLifecycle(Resource):
                 'suspended_until': serialize_datetime(row[1]) if row and row[1] else None,
                 'standing': row[2] if row else 'new',
                 'standing_score': float(row[3]) if row and row[3] is not None else None,
-                'session_rate': float(row[6]) if row and row[6] is not None else None,
+                'session_rate': float(row[5]) if row and row[5] is not None else None,
 
                 'capabilities': {
                     'can_be_listed':       bool(caps.get('can_be_listed')),
                     'can_charge':          bool(caps.get('can_charge')),
-                    'demo_only':           bool(caps.get('demo_only')),
                     'can_take_bookings':   bool(caps.get('can_take_bookings')),
                     'can_withdraw':        bool(caps.get('can_withdraw')),
                     'can_publish_content': bool(caps.get('can_publish_content')),
-                    'payout_ready':        bool(row[5]) if row else False,
+                    'payout_ready':        bool(row[4]) if row else False,
                 },
 
                 'screens': {
@@ -290,14 +228,8 @@ class AchieverLifecycle(Resource):
                     'locked': [s for s in ALL_SCREENS if s not in unlocked],
                 },
 
-                'demo': {
-                    'completed': done,
-                    'required': needed,
-                    'remaining': max(0, needed - done),
-                },
-
                 'checklist': _checklist(achiever_id, state),
-                'guidelines': guidelines_for(state, needed),
+                'guidelines': guidelines_for(state),
             }, status=200, bool=True)
 
         except Exception as e:

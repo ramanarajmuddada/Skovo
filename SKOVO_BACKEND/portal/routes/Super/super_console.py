@@ -99,7 +99,6 @@ class BusinessDashboard(Resource):
                         d.get('sessions_month'), d.get('sessions_prev_month')),
                     'achievers': {
                         'active': int(d.get('achievers_active') or 0),
-                        'probation': int(d.get('achievers_probation') or 0),
                         'pending': int(d.get('achievers_pending') or 0),
                         'suspended': int(d.get('achievers_suspended') or 0),
                     },

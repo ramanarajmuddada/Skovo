@@ -30,8 +30,8 @@ def _cohort_feedback_guard(user_id, achiever_id, cohort_id):
       3. the class has actually started.
 
     (3) is the judgement call. Feedback on a class nobody has attended yet is
-    not feedback — and these ratings are what an admin reads to move an achiever
-    off probation, so letting them fill up before anyone has taught anything
+    not feedback — and these ratings are what students and admins judge an achiever
+    by, so letting them fill up before anyone has taught anything
     would corrupt the one signal that decision rests on. `effective_cohort_status`
     is the same real-time derivation the browse list and the enrol guard use, so
     a student who can see "live" on the card can rate it.
@@ -156,7 +156,7 @@ class AchieverReviewList(Resource):
 
             avg = sum(r['rating'] for r in reviews) / len(reviews) if reviews else 0
             # Who joined each reviewed cohort and who attended, so admin can open
-            # a demo and see the class beside its reviews.
+            # a class and see it beside its reviews.
             from sqlalchemy import text as _t
             cohort_ids = sorted({r['context_id'] for r in reviews if r.get('context_type') == 'cohort' and r.get('context_id')})
             roster = {}
@@ -168,7 +168,7 @@ class AchieverReviewList(Resource):
             return jsonify(response={
                 'roster': roster,
                 # Which cohort / session each review is about, so admin can read
-                # them per demo instead of one mixed list.
+                # them per class instead of one mixed list.
                 'reviews': [{**_dict(r, users_by_id.get(r.get('user_id'))),
                              'user_id': r.get('user_id'), 'context_title': _context_title(r)} for r in reviews],
                 'avg_rating': round(avg, 1),

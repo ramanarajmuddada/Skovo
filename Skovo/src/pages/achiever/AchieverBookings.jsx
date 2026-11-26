@@ -892,7 +892,6 @@ const loadCohortDetail = (id) => achieverApi.get(`/achievers/portal/cohort-booki
 const COHORT_STATUS_LABEL = { upcoming: 'Upcoming', live: 'Live', completed: 'Completed', cancelled: 'Cancelled' };
 
 function cohortMoney(c) {
-  if (c.is_demo) return 'Demo';
   if (c.is_free) return 'Free';
   return inr(c.earned);
 }

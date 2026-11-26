@@ -66,7 +66,7 @@ export default function AdminAchieverGuidelines() {
           <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3">
             <Field label="Title"><input className={inputCls} value={form.title} onChange={(e) => set('title', e.target.value)} aria-label="Title" /></Field>
             <Field label="Summary"><textarea className={`${inputCls} py-2`} rows={2} value={form.summary} onChange={(e) => set('summary', e.target.value)} aria-label="Summary" /></Field>
-            <Field label="Steps (one per line)" hint={state === 'probation' ? 'Use {sessions} for "3 demo sessions" and {n} for the number.' : undefined}>
+            <Field label="Steps (one per line)">
               <textarea className={`${inputCls} py-2`} rows={5} value={form.steps} onChange={(e) => set('steps', e.target.value)} aria-label="Steps" />
             </Field>
             <Field label="Note (optional)"><textarea className={`${inputCls} py-2`} rows={2} value={form.note} onChange={(e) => set('note', e.target.value)} aria-label="Note" /></Field>

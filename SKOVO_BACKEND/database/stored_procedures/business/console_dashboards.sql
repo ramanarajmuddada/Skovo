@@ -48,10 +48,6 @@ BEGIN
            JOIN `achievers` a ON a.id = d.achiever_id
           WHERE d.status = 'pending' AND a.state = 'pending')      AS docs_to_review,
 
-        (SELECT COUNT(*) FROM `achievers`
-          WHERE state = 'probation'
-            AND demo_submitted_at IS NOT NULL)                     AS probations_waiting,
-
         (SELECT COUNT(*) FROM `payout_requests`
           WHERE status = 'pending')                                AS payouts_pending,
 
@@ -108,7 +104,6 @@ BEGIN
 
         -- ── Platform totals, for context ─────────────────────────────────
         (SELECT COUNT(*) FROM `achievers` WHERE state = 'active')   AS achievers_active,
-        (SELECT COUNT(*) FROM `achievers` WHERE state = 'probation') AS achievers_probation,
         (SELECT COUNT(*) FROM `users` WHERE deleted_at IS NULL)     AS students_total;
 END$$
 
@@ -173,7 +168,6 @@ BEGIN
           WHERE status IN ('paid','settled'))                              AS students_paying,
 
         (SELECT COUNT(*) FROM `achievers` WHERE state = 'active')          AS achievers_active,
-        (SELECT COUNT(*) FROM `achievers` WHERE state = 'probation')       AS achievers_probation,
         (SELECT COUNT(*) FROM `achievers` WHERE state = 'pending')         AS achievers_pending,
         (SELECT COUNT(*) FROM `achievers` WHERE state = 'suspended')       AS achievers_suspended,
 

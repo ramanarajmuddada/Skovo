@@ -59,7 +59,7 @@ BEGIN
              WHERE status = 'active'
              GROUP BY mentor_id
       ) mn ON mn.mentor_id = a.id
-     WHERE a.state IN ('active','probation')
+     WHERE a.state = 'active'
        AND a.email IS NOT NULL
 
        -- The child-safety rule, applied as a filter rather than an error:
@@ -122,7 +122,7 @@ BEGIN
             SELECT achiever_id, ROUND(AVG(rating), 1) AS avg_rating
               FROM achiever_reviews WHERE is_active = 1 GROUP BY achiever_id
       ) rv ON rv.achiever_id = a.id
-     WHERE a.state IN ('active','probation')
+     WHERE a.state = 'active'
        AND a.email IS NOT NULL
        -- IFNULL matters: legacy accounts predating the DPDP migration have
        -- No education-level targeting. An achiever is shown to every student
@@ -152,7 +152,7 @@ BEGIN
     SELECT IFNULL(MIN(IFNULL(session_rate, 0)), 0) AS min_price,
            IFNULL(MAX(IFNULL(session_rate, 0)), 0) AS max_price
       FROM `achievers`
-     WHERE state IN ('active', 'probation') AND email IS NOT NULL;
+     WHERE state = 'active' AND email IS NOT NULL;
 END$$
 
 DELIMITER ;

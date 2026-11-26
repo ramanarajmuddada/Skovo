@@ -4,7 +4,7 @@ import {
   GraduationCap, Star, BookOpen, Briefcase, Users, ArrowRight,
   Menu, X, CheckCircle, Shield, Sparkles, Award, MessageSquare,
   TrendingUp, Mail, FolderLock, Check, Loader2, ChevronDown, CalendarDays, Clock,
-  Building2, UserCheck, FileCheck2, Video, Rocket, Flame, Target, Crown, Zap, LogIn,
+  Building2, UserCheck, FileCheck2, Rocket, Flame, Target, Crown, Zap, LogIn,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -666,7 +666,6 @@ function AchieversSection() {
                 {[
                   { icon: UserCheck,  title: 'Apply',          text: 'Create your achiever account and fill in your profile.' },
                   { icon: FileCheck2, title: 'Get verified',   text: 'Upload your documents; our team checks identity, employment and background.' },
-                  { icon: Video,      title: 'Run a demo',     text: 'Host a short demo session so we can see you teach.' },
                   { icon: Rocket,     title: 'Start teaching',        text: 'Publish cohorts, take 1:1 sessions and get paid to your bank.' },
                 ].map(({ icon: Icon, title, text }, i, arr) => (
                   <li key={title} className="relative flex gap-4">

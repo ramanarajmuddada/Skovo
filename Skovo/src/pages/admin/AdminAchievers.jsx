@@ -3,8 +3,7 @@ import { Tabs } from '../../components/admin/v1/AdminV1Kit';
 import { Link } from 'react-router-dom';
 import { adminApi as api } from '../../services/api';
 import { FormSelect, Textarea, Input } from '../../components/ui/index.jsx';
-import { DemoTargetField } from '../../components/admin/AchieverControls';
-import { Star, Pencil, X, ChevronDown, Check, Type, Building2, Briefcase, AlignLeft, Link2, Tag, AlertCircle, Layers, Mail, Lock, Phone, UserCheck, Eye, IndianRupee, User, FileText, Video, Landmark, Settings2, History, BookOpen } from 'lucide-react';
+import { Star, Pencil, X, ChevronDown, Check, Type, Building2, Briefcase, AlignLeft, Link2, Tag, AlertCircle, Layers, Mail, Lock, Phone, UserCheck, Eye, IndianRupee, User, FileText, Landmark, Settings2, History, BookOpen } from 'lucide-react';
 import {
   Th, Td, Avatar, ActionBtn,
   TableShell, LoadingRows, EmptyState, Pagination,
@@ -17,7 +16,7 @@ import StatTile from '../../components/admin/StatTile';
 import { Search as SearchIcon, Users as UsersIcon, Hourglass, ShieldCheck as ShieldIcon, BadgeCheck } from 'lucide-react';
 
 const STATE_TONE = {
-  active: 'green', probation: 'blue', suspended: 'amber',
+  active: 'green', suspended: 'amber',
   banned: 'red', rejected: 'red', pending: 'amber',
 };
 import AvatarImg from '../../components/ui/AvatarImg';
@@ -107,18 +106,11 @@ function CommissionPanel({ achieverId, onToast }) {
             </>
           ) : (
             <>
-              {/* The platform default is not quoted here any more.
-                  
-                  It used to read "The platform default applies — 10% to SKOVO,
-                  90% to the achiever", which put a specific number against a
-                  person nobody had agreed a number with. Commission on this
-                  platform is settled per achiever, at approval out of probation,
-                  so a default shown against an unapproved achiever is a figure
-                  that will not be the one they end up on. */}
+              {/* No default is quoted: commission is settled per achiever,
+                  so a default shown here would read as a decision nobody made. */}
               <p className="text-sm font-semibold text-slate-800">No rate set yet</p>
               <p className="text-xs text-slate-400 mt-0.5">
-                Their share is agreed when they are approved out of probation.
-                You can set it here at any time.
+                Set their share here at any time.
               </p>
             </>
           )}
@@ -182,17 +174,16 @@ const pctDecimals = (ratio) => (Number((ratio * 100).toFixed(2)) % 1 === 0 ? 0 :
  * Everything known about one achiever, in one request set.
  *
  * The record was split in two and half of it went dark on approval: Achiever
- * Review owned documents, demos and student reviews and only rendered them
- * while the achiever was in probation, while this screen showed seven contact
+ * Review owned documents and only rendered them while the application was
+ * open, while this screen showed seven contact
  * fields and nothing about the review that produced the approval.
  *
  * Read-only, deliberately. Every action — approve, suspend, ban, request a
- * document, set the demo target — stays on Achiever Review, which is the screen
+ * document — stays on Achiever Review, which is the screen
  * that owns the decisions. This one reads the record.
  */
 function useAchieverRecord(achieverId) {
   const [dossier, setDossier] = useState(null);
-  const [demos, setDemos]     = useState(null);
   const [reviews, setReviews] = useState(null);
   const [status, setStatus]   = useState('loading');
   const [nonce, setNonce]     = useState(0);
@@ -215,14 +206,6 @@ function useAchieverRecord(achieverId) {
         setDossier(d.response);
         setStatus('ready');
 
-        // Only where there is something to fetch: a rejected or banned
-        // achiever never ran a demo.
-        const st = d.response?.achiever?.state;
-        if (['probation', 'active', 'suspended'].includes(st)) {
-          api.get(`${base}/probation`)
-            .then(({ data: p }) => { if (alive && p?.bool) setDemos(p.response); })
-            .catch(() => {});
-        }
         // Not under the admin prefix: student reviews live at /achiever-reviews/<id>,
         // the same route the student portal posts them to. adminRequest only swaps
         // the token, so an admin JWT reaches it fine.
@@ -245,7 +228,6 @@ function useAchieverRecord(achieverId) {
   // flash for one frame the next time a row is clicked.
   return {
     dossier: achieverId ? dossier : null,
-    demos:   achieverId ? demos   : null,
     reviews: achieverId ? reviews : null,
     status:  achieverId ? status  : 'loading',
     reload:  () => setNonce(n => n + 1),
@@ -361,7 +343,6 @@ function AskForDocument({ achieverId, dossier, onToast, onDone }) {
 // The directory's own columns. Each answers a question an admin scanning the
 // list actually asks, which "Designation / Company / Domain" did not: those say
 // what the achiever typed about themselves, not how they are doing.
-const fmtDemoProgress = (done, need) => (need ? `${done ?? 0} / ${need}` : '—');
 // Only a rate somebody agreed for this achiever. No platform default: a column
 // reading "10% (default)" on every row says a decision was made about each of
 // them when none was, and it makes the achievers who DO have a negotiated rate
@@ -381,8 +362,6 @@ const fmtJoined = (iso) => {
 // permissive value there is — for an achiever who actually has 2.
 const orDash = (v) => (v === undefined || v === null || v === '' ? '—' : v);
 const fmtSeats = (v) => (v === undefined ? '—' : v === null ? 'Unlimited' : String(v));
-const fmtDemos = (done, need) =>
-  (need === undefined || need === null ? '—' : `${done ?? 0} / ${need}`);
 // A date and time an admin can read, for the audit lines. Dates alone are not
 // enough on the state trail: a suspension and the lift that followed it an hour
 // later both say "21 Sept 2026" and look like one event.
@@ -485,109 +464,6 @@ function DocLine({ d }) {
   );
 }
 
-/**
- * The demo target, on the Demos tab.
- *
- * It lived on Manage, beside seats and suspensions, which meant reading the
- * demo numbers and changing them were two different tabs. Everything about
- * demos now sits together.
- *
- * The same control does two jobs, and the wording says which:
- *
- *   probation  — "Set target". They are already working through demos; this
- *                raises or lowers how many.
- *   active     — "Send back to demos". They finished probation and are earning,
- *                and something in their reviews says they should prove it
- *                again. This drops them back to probation, which removes
- *                `can_charge`, so no NEW paid work can be booked while the
- *                cohorts and sessions students already paid for run out.
- *
- * A reason is required either way and the achiever is told: being put back on
- * unpaid demos without being told why is the version of this that generates a
- * support ticket.
- */
-function DemoTargetPanel({ achieverId, record, onToast, onDone }) {
-  const state = record?.state;
-  const done = record?.demos_done ?? 0;
-  const current = record?.demos_required ?? null;
-  // Opens on the target they actually have, not an empty box.
-  //
-  // It started blank with an "e.g. 5" placeholder, which made the field ask a
-  // question the screen already knew the answer to -- and the +/- buttons had
-  // nothing to count from, so the first press jumped to a number nobody chose.
-  // Seeded from the record, so + on a target of 2 gives 3.
-  const [target, setTarget] = useState(
-    record?.demos_required == null ? '' : String(record.demos_required));
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  // Nothing to set for someone who has not been approved yet, and a banned
-  // account has no demos to run.
-  if (!['probation', 'active', 'suspended'].includes(state)) return null;
-
-  const sendBack = state !== 'probation';
-
-  const save = async () => {
-    const n = Number(target);
-    if (!Number.isInteger(n) || n < 1) {
-      onToast?.('Say how many demos they need — a whole number, at least 1.', false); return;
-    }
-    if (!reason.trim()) { onToast?.('A reason is required.', false); return; }
-    setBusy(true);
-    try {
-      const { data } = await api.post(
-        `/skovo-platform-panel-admin/achiever-lifecycle/${achieverId}/probation`,
-        { decision: 'set_demos', demos_required: n, reason: reason.trim() });
-      if (data?.bool) {
-        onToast?.(data.response?.message || 'Demo target set.');
-        // Not cleared: what was just saved IS the current target, and blanking
-        // the field would put the placeholder back over a number that is now
-        // true.
-        setTarget(String(n)); setReason('');
-        onDone?.();
-      } else {
-        onToast?.(data?.response?.message || 'That did not go through.', false);
-      }
-    } catch {
-      onToast?.('Connection problem — nothing was changed.', false);
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <div className="rounded-xl border border-slate-200 p-3 space-y-2.5 mt-3">
-      <div>
-        <p className="text-xs font-semibold text-slate-600">
-          {sendBack ? 'Send back to demos' : 'Demo target'}
-        </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {sendBack
-            ? 'They stop taking new paid work until the demos are done. Cohorts and bookings students have already paid for are untouched.'
-            : `They have ${done} of ${current ?? '—'} done. This replaces the target, so it can go down as well as up.`}
-        </p>
-      </div>
-
-      <DemoTargetField value={target} onChange={setTarget}
-                       done={done} id="demos-tab-target" disabled={busy} />
-
-      <Input
-        id="demos-tab-reason"
-        label="Reason"
-        required
-        value={reason}
-        disabled={busy}
-        onChange={e => setReason(e.target.value)}
-        placeholder="The achiever sees this."
-      />
-
-      <button type="button" onClick={save} disabled={busy}
-              className="min-h-11 px-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-600
-                         hover:bg-blue-100 transition-colors disabled:opacity-50">
-        {busy ? 'Saving…' : (sendBack ? 'Send back to demos' : 'Set target')}
-      </button>
-    </div>
-  );
-}
-
 function TabEmpty({ message }) {
   return <p className="text-sm text-slate-400 py-6 text-center">{message}</p>;
 }
@@ -602,11 +478,11 @@ const DOC_TONE = {
 
 function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
   const [tab, setTab] = useState('details');
-  const { dossier, demos, reviews, status, reload: reloadRecord } = useAchieverRecord(a?.id);
+  const { dossier, reviews, status, reload: reloadRecord } = useAchieverRecord(a?.id);
 
   // Every action in here changes a number the row behind it is showing.
-  // `reload` only re-read the dossier, so setting the demo target to 3 updated
-  // the panel and left the card underneath reading "DEMOS 0 / 2" -- and closing
+  // `reload` only re-read the dossier, so a change updated the panel and left
+  // the card underneath stale -- and closing
   // the panel showed you the stale figure with nothing left to correct it.
   // Anything that reloads the record now reloads the list too.
   const reload = useCallback(() => { reloadRecord(); onChanged?.(); },
@@ -686,7 +562,6 @@ function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
   const TABS = [
     { key: 'details',   label: 'Details', icon: User },
     { key: 'documents', label: 'Docs', count: docs.length, icon: FileText },
-    { key: 'demos',     label: 'Demos', icon: Video },
     { key: 'cohorts',   label: 'Cohorts', icon: BookOpen },
     { key: 'reviews',   label: 'Reviews', count: revList.length, icon: Star },
     { key: 'bank',      label: 'Bank', icon: Landmark },
@@ -739,7 +614,6 @@ function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
                     account has a portal login. A field whose value never differs
                     between records is a field nobody can act on. */}
                 <Field label="Cohort seats" value={fmtSeats(ach.cohort_seat_allocation)} />
-                <Field label="Demos" value={fmtDemos(ach.demos_done, ach.demos_required)} />
                 {/* Background check is not shown for v2. The admin control that
                     started one and recorded its result was removed deliberately,
                     and SKOVO has not signed a BGV vendor, so this field could
@@ -752,7 +626,7 @@ function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
                 */}
                 {/* The date, not the status word.
 
-                    This read "submitted" for an achiever sitting on probation,
+                    This read "submitted" for an already approved achiever,
                     because approving an application moves `state` and leaves
                     `application_status` where it was -- so the field argued with
                     the badge at the top of the panel. The date says the same
@@ -795,7 +669,7 @@ function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
                     
                     It was the latest of several, from a column overwritten on
                     every change, sitting under a badge it often appeared to
-                    contradict -- "Lifting the ban" beside Probation. History
+                    contradict -- "Lifting the ban" beside Active. History
                     shows the same sentence in the sequence that explains it,
                     with the two before it and who wrote each one. */}
               </div>
@@ -939,34 +813,6 @@ function AchieverDetailModal({ achiever: a, onClose, onToast, onChanged }) {
                                 onToast={onToast} onDone={reload} />
               </div>
             )
-          )}
-
-          {status === 'ready' && tab === 'demos' && (
-            <div className="space-y-4">
-            {!demos ? (
-              <>
-                <AchieverCohortsPanel achieverId={a.id} filter="demo" />
-                <DemoTargetPanel achieverId={a.id} record={ach}
-                                 onToast={onToast} onDone={reload} />
-              </>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {/* "Required: 0 / 2" read as though nothing was required.
-                      The target is the requirement; the fraction is progress. */}
-                  <Field label="Required" value={ach.demos_required ?? '—'} />
-                  <Field label="Done so far" value={fmtDemos(ach.demos_done, ach.demos_required)} />
-                  <Field label="Completed" value={demos.summary.completed} />
-                  <Field label="No-shows" value={demos.summary.no_shows} />
-                  <Field label="Avg rating" value={orDash(demos.summary.average_rating)} />
-                </div>
-                {/* Per demo cohort: tap one to see who attended and their reviews. */}
-                <AchieverCohortsPanel achieverId={a.id} filter="demo" />
-                <DemoTargetPanel achieverId={a.id} record={ach}
-                                 onToast={onToast} onDone={reload} />
-              </div>
-            )}
-            </div>
           )}
 
           {status === 'ready' && tab === 'reviews' && (
@@ -1120,7 +966,7 @@ export default function AdminAchievers() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <StatTile label="All achievers" sub="all states" value={achievers.length} icon={UsersIcon} tone="blue" onClick={() => pickState('')} active={!stateF} />
         <StatTile label="Pending" sub="to review" value={stateCount('pending')} icon={Hourglass} tone="amber" onClick={() => pickState('pending')} active={stateF === 'pending'} />
-        <StatTile label="Probation" sub="in demos" value={stateCount('probation')} icon={ShieldIcon} tone="violet" onClick={() => pickState('probation')} active={stateF === 'probation'} />
+        <StatTile label="Suspended" sub="paused" value={stateCount('suspended')} icon={ShieldIcon} tone="violet" onClick={() => pickState('suspended')} active={stateF === 'suspended'} />
         <StatTile label="Active" sub="listed" value={stateCount('active')} icon={BadgeCheck} tone="emerald" onClick={() => pickState('active')} active={stateF === 'active'} />
       </div>
 
@@ -1163,24 +1009,23 @@ export default function AdminAchievers() {
                   means "has a portal login"; and the delete action, which is not
                   something a directory should offer beside a row.
 
-                  Arrived: State, Demos, Seats and Rate -- the four things that
+                  Arrived: State, Seats and Rate -- the things that
                   tell you whether a row needs you. */}
               <tr>
                 <Th>Achiever</Th>
                 <Th>Role</Th>
                 <Th>State</Th>
-                <Th>Demos</Th>
                 <Th>Seats</Th>
                 <Th>Rate</Th>
                 <Th>Open</Th>
               </tr>
             </thead>
             {loading ? (
-              <LoadingRows cols={7} rows={5} />
+              <LoadingRows cols={6} rows={5} />
             ) : pagedAchievers.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={6}>
                     <EmptyState icon={Star}
                                 message={query ? 'No achievers match that search'
                                                : 'No achievers yet'} />
@@ -1216,12 +1061,6 @@ export default function AdminAchievers() {
                       {a.state
                         ? <StatusBadge status={a.state} tone={STATE_TONE[a.state]} />
                         : <span className="text-xs text-slate-400">—</span>}
-                    </Td>
-                    {/* Only meaningful while they are working through demos. An
-                        active achiever finished them; a pending one has not been
-                        given a target yet. Both read '—' rather than 0 / 0. */}
-                    <Td className="text-sm text-slate-900 whitespace-nowrap">
-                      {fmtDemoProgress(a.demos_done, a.demos_required)}
                     </Td>
                     <Td className="text-sm text-slate-900 whitespace-nowrap">
                       {fmtSeats(a.cohort_seat_allocation)}
@@ -1274,8 +1113,6 @@ export default function AdminAchievers() {
                   : null}
                 action={null}
                 fields={[
-                  { label: 'Demos',  value: a.demos_required
-                      ? fmtDemoProgress(a.demos_done, a.demos_required) : null },
                   { label: 'Seats',  value: fmtSeats(a.cohort_seat_allocation) },
                   { label: 'Rate',   value: fmtCommission(a.commission_percent) },
                   { label: 'Role',   value: a.designation || a.company },

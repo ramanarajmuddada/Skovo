@@ -249,7 +249,7 @@ def _enforce(achiever_id, reason, row, r):
     if points >= int(r['strike_suspend_at']):
         suspend(achiever_id, f"{points} strikes in {days} days (last: {why}).")
         return
-    if points >= int(r['strike_pause_at']) or (st == 'probation' and reason == 'missed'):
+    if points >= int(r['strike_pause_at']):
         call_proc_one('sp_achiever_set_paused', achiever_id, 1)
         db.session.commit()
         _tell(achiever_id, 'New classes paused',
@@ -406,11 +406,6 @@ def _close_cohort(c):
         call_proc_one('sp_class_issue_add', 'no_checkins', 'cohort', c['id'], None, c['achiever_id'], None,
                       'Started, but nobody checked in. Closed automatically; money held until admin checks.', 'open')
         db.session.commit()
-    try:
-        call_proc_one('sp_achiever_demo_complete', c['achiever_id'])
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
     # Its tasks open now: tell the students who checked in.
     try:
         from portal.routes.Achiever.achiever import _open_tasks_now
@@ -466,12 +461,6 @@ def _close_session(s):
     call_proc_one('sp_achiever_session_set_status', s['id'], s['achiever_id'], 'completed', None, None, None)
     call_proc_one('sp_session_mark_ended', s['id'])
     db.session.commit()
-    if s.get('is_demo'):
-        try:
-            call_proc_one('sp_achiever_demo_complete', s['achiever_id'])
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
 
 
 def watch():
@@ -580,7 +569,6 @@ def guide_tabs():
         f"Leaving early (confirmed by admin): {r['strike_left_early']} strike.",
         f"{r['strike_pause_at']} strikes in {r['strike_days']} days pauses new classes until an admin reviews. "
         f"{r['strike_suspend_at']} suspends the account and upcoming students get 100% back.",
-        "On probation, one missed class pauses new classes.",
         f"Each strike drops off after {r['strike_days']} days. A fair reason (power cut with proof) can be raised with support.",
     ]
     cancel = student_rules('cohort')

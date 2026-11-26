@@ -30,7 +30,6 @@ from portal.models import db
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.routes.AchieverApplication.achiever_lifecycle import guidelines_for
 from portal.helpers import trust as T
-from portal.helpers import achiever_demo as D
 from . import ns, logger
 
 
@@ -187,12 +186,7 @@ def _status_payload(achiever_id):
         # Same copy the lifecycle endpoint serves, so the screen that asks for
         # documents and the screen that explains why never drift apart. Server
         # side on purpose: the wording changes without a frontend deploy.
-        'guidelines': guidelines_for(
-            t.get('state') or 'pending',
-            t.get('demo_sessions_required') or D.DEFAULT_REQUIRED),
-        'demos_done': int(t.get('demo_sessions_done') or 0),
-        'demos_required': int(t.get('demo_sessions_required') or D.DEFAULT_REQUIRED),
-        'demo_reviews': D.review_payload(achiever_id),
+        'guidelines': guidelines_for(t.get('state') or 'pending'),
         'application_status': t.get('application_status'),
         'rejection_reason': t.get('rejection_reason'),
         'submitted_at': (serialize_datetime(t['application_submitted_at'])

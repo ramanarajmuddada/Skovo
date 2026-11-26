@@ -109,7 +109,7 @@ def _achiever_row_dict(m, domains_by_id=None):
         'cohort_seat_allocation': m.get('cohort_seat_allocation'),
         # Where this achiever stands in the lifecycle, and why.
         #
-        # `status` above is the account flag; `state` is pending / probation /
+        # `status` above is the account flag; `state` is pending / active /
         # active / suspended / banned. The Achievers screen listed designation,
         # company and domain but had no way to show which achievers were
         # suspended or banned -- on the screen whose whole job is managing them.
@@ -122,11 +122,9 @@ def _achiever_row_dict(m, domains_by_id=None):
         # The directory listed designation, company and domain -- three things
         # the achiever typed about themselves -- and nothing about their
         # standing. An admin scanning 200 achievers for the ones needing
-        # attention (stuck on demos, suspended, on a negotiated rate) had to
+        # attention (waiting on review, suspended, on a negotiated rate) had to
         # open every record to find out. These all sit on the same row the list
         # already reads, so none of it costs a query.
-        'demos_done':        int(m.get('demo_sessions_done') or 0),
-        'demos_required':    int(m.get('demo_sessions_required') or 0) or None,
         'session_rate':      m.get('session_rate'),
         'standing':          m.get('standing'),
     }
@@ -200,8 +198,8 @@ class AdminAchieverList(Resource):
                 # It used to fall back to the global default, so every achiever
                 # without a negotiated rate displayed "10% (default)" -- a number
                 # that reads as a decision someone made about that person when
-                # nobody had. Commission is agreed per achiever, at approval out
-                # of probation, so "not set yet" is the honest answer and the one
+                # nobody had. Commission is agreed per achiever, after
+                # verification, so "not set yet" is the honest answer and the one
                 # an admin can act on.
                 #
                 # Stored 0-1, shown as a percentage.
@@ -221,7 +219,7 @@ class AdminAchieverList(Resource):
     # is the one thing the access model forbids — an account made this way has
     # credentials its owner never picked, and every action under it is deniable.
     # It also skipped the entire pipeline: an admin-created achiever had no
-    # documents reviewed, no demo sessions and no student reviews, yet could be
+    # documents reviewed, yet could be
     # marked verified on the way in.
     #
     # Achievers self-register and are approved through
@@ -273,7 +271,7 @@ class AdminAchieverDetail(Resource):
             # `is_verified` no longer grants anything. It was mirrored into a
             # trust tier here because every guard read the tier; guards now read
             # `state`, which moves only through the lifecycle procedures — an
-            # admin ticking a box must not skip document review and demos.
+            # admin ticking a box must not skip document review.
 
             logger.info(f"Admin updated achiever {achiever_id} (via sp_achievers_update)")
             return jsonify(response={'message': 'Achiever updated.', 'achiever': _achiever_row_dict(updated)}, status=200, bool=True)
@@ -317,13 +315,10 @@ class AdminAchieverDetail(Resource):
 # Removed on purpose: PATCH /achievers/<id>/verify.
 #
 # A single "verified" toggle is not what verification is any more. An achiever
-# becomes trusted by a sequence — documents accepted, application approved,
-# three demo sessions run, real student reviews read — and each step is a
-# separate decision with its own audit row.
+# becomes trusted by a sequence: documents accepted, then the application
+# approved, each a separate decision with its own audit row.
 #
-# The endpoint delegated to the trust ladder, which no longer decides anything,
-# and no screen called it. Verification now runs through
-# /achiever-lifecycle/<id>/approve-application and /achiever-lifecycle/<id>/probation.
+# Verification runs through /achiever-lifecycle/<id>/approve-application.
 # ─────────────────────────────────────────────────────────────────────────────
 
 

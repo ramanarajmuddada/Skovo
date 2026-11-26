@@ -5,7 +5,6 @@ PUT    /achiever-guidelines/<state>    save the admin's copy (version goes up)
 DELETE /achiever-guidelines/<state>    back to the built-in default
 
 Copy per state: title, summary, steps[], sections[{heading, points[]}], note.
-Probation text may use {sessions} ("3 demo sessions") and {n} (3).
 """
 from portal.helpers.error_capture import capture_error
 import json
@@ -19,9 +18,8 @@ from portal.helpers.audit import log_audit
 from portal.routes.AchieverApplication.achiever_lifecycle import GUIDELINES
 from . import ns, logger
 
-STATES = ('pending', 'probation', 'active', 'suspended', 'banned', 'cohort_guide')
-LABELS = {'pending': 'Applying (before approval)', 'probation': 'Approved — demo sessions',
-          'active': 'Live', 'suspended': 'Suspended', 'banned': 'Closed',
+STATES = ('pending', 'active', 'suspended', 'banned', 'cohort_guide')
+LABELS = {'pending': 'Applying (before approval)', 'active': 'Live', 'suspended': 'Suspended', 'banned': 'Closed',
           'cohort_guide': 'Create cohort guide'}
 
 

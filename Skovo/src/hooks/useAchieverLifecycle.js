@@ -77,7 +77,6 @@ export function useAchieverLifecycle() {
 
     state,
     isPending:   state === 'pending',
-    isProbation: state === 'probation',
     isActive:    state === 'active',
     isSuspended: state === 'suspended',
     isBanned:    state === 'banned',
@@ -86,7 +85,6 @@ export function useAchieverLifecycle() {
     unlocked,
 
     caps:       data?.capabilities || {},
-    demo:       data?.demo || { completed: 0, required: 3, remaining: 3 },
     checklist:  data?.checklist || [],
     guidelines: data?.guidelines || null,
   };

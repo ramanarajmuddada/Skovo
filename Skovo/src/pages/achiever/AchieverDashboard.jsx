@@ -216,7 +216,7 @@ const STATUS_STYLE = {
 };
 
 // Each carries the screen key the lifecycle gates on. Without it the panel
-// offered "Create cohort" to an achiever on probation, whose sidebar has no
+// offered "Create cohort" to an achiever whose sidebar has no
 // Cohorts entry and whose route guard sends them straight back -- a shortcut to
 // a door that is locked.
 const ACTIONS = [

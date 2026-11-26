@@ -121,7 +121,7 @@ BEGIN
              WHERE status = 'active'
              GROUP BY mentor_id
       ) mn ON mn.mentor_id = a.id
-     WHERE a.state IN ('active','probation')
+     WHERE a.state = 'active'
        AND a.email IS NOT NULL
 
        -- The child-safety rule, applied as a filter rather than an error:
@@ -182,7 +182,7 @@ BEGIN
             SELECT achiever_id, ROUND(AVG(rating), 1) AS avg_rating
               FROM achiever_reviews WHERE is_active = 1 GROUP BY achiever_id
       ) rv ON rv.achiever_id = a.id
-     WHERE a.state IN ('active','probation')
+     WHERE a.state = 'active'
        AND a.email IS NOT NULL
        -- IFNULL matters: legacy accounts predating the DPDP migration have
        -- No education-level targeting. An achiever is shown to every student
@@ -212,7 +212,7 @@ BEGIN
       FROM achievers a
       JOIN JSON_TABLE(IFNULL(a.domains, JSON_ARRAY()), '$[*]'
              COLUMNS (domain VARCHAR(120) PATH '$')) jt
-     WHERE a.state IN ('active','probation') AND jt.domain IS NOT NULL
+     WHERE a.state = 'active' AND jt.domain IS NOT NULL
      ORDER BY jt.domain;
 END$$
 
@@ -249,7 +249,7 @@ BEGIN
              GROUP BY achiever_id
       ) ch ON ch.achiever_id = a.id
      WHERE a.id = p_achiever_id
-       AND a.state IN ('active','probation');
+       AND a.state = 'active';
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_achiever_public_reviews`$$

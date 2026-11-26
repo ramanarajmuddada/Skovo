@@ -1,8 +1,8 @@
 -- ============================================================================
 -- SKOVO — achiever lifecycle
 --
---     PENDING -> PROBATION -> ACTIVE -> SUSPENDED -> BANNED
---                               ^__________|         (terminal)
+--     PENDING -> ACTIVE -> SUSPENDED -> BANNED
+--                 ^__________|         (terminal)
 --
 -- Capability follows approved evidence. No procedure here takes a "level" as
 -- an argument, because the previous design did and that is how an achiever
@@ -38,7 +38,7 @@ BEGIN
         RESIGNAL;
     END;
 
-    IF p_to_state NOT IN ('pending','probation','active','suspended','banned') THEN
+    IF p_to_state NOT IN ('pending','active','suspended','banned') THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'INVALID_STATE';
     END IF;
 
@@ -172,6 +172,11 @@ BEGIN
         SET v_to = 'pending';
     END IF;
 
+    -- History written before demo sessions were removed.
+    IF v_to = 'probation' THEN
+        SET v_to = 'active';
+    END IF;
+
     -- They were suspended when the ban landed, so that is what they go back to.
     -- The end date comes back with it only if it has not already passed -
     -- restoring an expired one would leave a suspension the nightly job lifts
@@ -267,7 +272,6 @@ CREATE PROCEDURE `sp_achiever_approve_application`(
 BEGIN
     DECLARE v_state   VARCHAR(20);
     DECLARE v_missing INT DEFAULT 0;
-    DECLARE v_demos   INT DEFAULT 3;
 
     SELECT state INTO v_state FROM `achievers` WHERE id = p_achiever_id;
 
@@ -300,202 +304,27 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'DOCUMENTS_INCOMPLETE';
     END IF;
 
-    -- Three is the starting point for someone who has never been approved.
-    -- It is NOT re-imposed on someone who already has a target.
+    -- Admin verification is the only gate: an approved achiever is active at
+    -- once and may create paid cohorts. The seat allocation is the admin's
+    -- decision at this same moment.
     --
-    -- It used to be assigned flat, and that quietly undid admin decisions. A
-    -- lifted ban returns the achiever to 'pending', so approval is asked for a
-    -- second time - and that second approval reset a target an admin had set
-    -- by hand on the Set demo target control. Someone put on 1 demo came back
-    -- owing 3, with nothing on screen saying why it changed.
-    --
-    -- COALESCE, so the column decides: NULL means nobody has ever set one.
-    --
-    -- The seat allocation lands here too. Approval is the moment the admin
-    -- decides how big this person's cohorts may be, and setting it now rather
-    -- than at the probation gate means the free demo cohorts they run during
-    -- probation are capped as well -- otherwise there is a window where a
-    -- cohort is unlimited.
-    --
-    -- Assigned, not COALESCEd.
-    --
-    -- This used COALESCE so passing NULL kept whatever was already on the
-    -- row. That was right when NULL meant "not supplied". It is wrong now:
-    -- the approve dialog makes the admin choose between a number and
-    -- Unlimited, and Unlimited IS NULL. Under COALESCE, choosing Unlimited
-    -- for someone who had been given a cap earlier would keep the old cap
-    -- while telling the admin it was unlimited.
-    --
-    -- The route guarantees a choice was made: it rejects a request with no
-    -- cohort_seats key at all. Whatever arrives here is a decision.
+    -- Assigned, not COALESCEd: "Unlimited" is NULL and must be able to clear an
+    -- earlier cap. The route guarantees the admin made a choice.
     UPDATE `achievers`
-       SET demo_sessions_required = COALESCE(demo_sessions_required, 3),
-           cohort_seat_allocation = p_cohort_seats
+       SET cohort_seat_allocation = p_cohort_seats
      WHERE id = p_achiever_id;
 
-    SELECT demo_sessions_required INTO v_demos
-      FROM `achievers` WHERE id = p_achiever_id;
-
-    -- The reason says the number that actually applies. It read "three demo
-    -- sessions required" unconditionally, so the permanent record disagreed
-    -- with the account the moment the target was anything but three.
-    CALL sp_achiever_set_state(p_achiever_id, 'probation',
-                               CONCAT('Application approved - ', v_demos,
-                                      ' demo session', IF(v_demos = 1, '', 's'),
-                                      ' required'),
+    CALL sp_achiever_set_state(p_achiever_id, 'active', 'Application approved',
                                NULL, p_actor_id, 'admin');
 END$$
 
 
--- ---------------------------------------------------------------------------
--- Count a completed demo session and submit for review at three.
---
--- Called when a demo session is marked completed. Counts from the sessions
--- table rather than incrementing a counter, so a double call or a replayed
--- webhook cannot inflate the total.
--- ---------------------------------------------------------------------------
+-- Retired with the demo-session workflow.
 DROP PROCEDURE IF EXISTS `sp_achiever_demo_complete`$$
-CREATE PROCEDURE `sp_achiever_demo_complete`(
-    IN p_achiever_id CHAR(36)
-)
-BEGIN
-    DECLARE v_done   INT DEFAULT 0;
-    DECLARE v_needed INT DEFAULT 3;
-    DECLARE v_state  VARCHAR(20);
-
-    SELECT state, IFNULL(demo_sessions_required, 3)
-      INTO v_state, v_needed
-      FROM `achievers` WHERE id = p_achiever_id;
-
-    -- Sessions AND cohorts. Counting only `achiever_sessions` was wrong: a
-    -- probation achiever cannot charge, so the demo they actually run is a
-    -- FREE COHORT, and that is what the spec describes ("Free Saturday 6:00
-    -- demo. Priya enrols. End. 1/3"). Mahesh ran exactly that, ended it, and
-    -- his counter stayed at 0/3 — leaving him stuck on probation with no way
-    -- to reach `active`, which is what unlocks charging.
-    --
-    -- A cohort counts when it is the achiever's own, a DEMO (free, made on
-    -- probation: cohorts.is_demo), `completed`, and
-    -- **had at least one enrolment**. The enrolment guard is the point: without
-    -- it an achiever creates three empty free cohorts, ends them immediately,
-    -- and promotes themselves. A demo nobody attended is not a demo.
-    --
-    -- Still a COUNT over rows rather than an increment, for the original
-    -- reason: a double call or replayed webhook cannot inflate the total.
-    SELECT
-        (SELECT COUNT(*)
-           FROM `achiever_sessions`
-          WHERE mentor_id = p_achiever_id
-            AND is_demo = 1
-            AND status = 'completed'
-            AND IFNULL(no_show, 0) = 0)
-      + (SELECT COUNT(*)
-           FROM `cohorts` c
-          WHERE c.achiever_id = p_achiever_id
-            AND c.status = 'completed'
-            AND c.is_demo = 1
-            AND EXISTS (SELECT 1 FROM `cohort_enrollments` ce
-                         WHERE ce.cohort_id = c.id))
-      INTO v_done;
-
-    UPDATE `achievers`
-       SET demo_sessions_done = v_done,
-           demo_submitted_at  = IF(v_done >= v_needed AND demo_submitted_at IS NULL,
-                                   UTC_TIMESTAMP(), demo_submitted_at),
-           updated_at = UTC_TIMESTAMP()
-     WHERE id = p_achiever_id;
-
-    SELECT v_done AS demos_done,
-           v_needed AS demos_needed,
-           (v_done >= v_needed AND v_state = 'probation') AS ready_for_review;
-END$$
 
 
--- ---------------------------------------------------------------------------
--- Everything an admin needs to judge a probation, in one call: the achiever,
--- their three demos, and the student's own words about each.
--- ---------------------------------------------------------------------------
+-- Retired with the demo-session workflow.
 DROP PROCEDURE IF EXISTS `sp_achiever_probation_review`$$
-CREATE PROCEDURE `sp_achiever_probation_review`(
-    IN p_achiever_id CHAR(36)
-)
-BEGIN
-    -- Sessions AND cohorts, in that order, because the counter counts both.
-    --
-    -- This returned 1-on-1 sessions only, while `sp_achiever_demo_complete`
-    -- was widened to count free cohorts as demos. The dossier then showed
-    -- "2 of 3 demo sessions done" directly above "No demo sessions yet" —
-    -- one screen, two sources, disagreeing. Worse than either being wrong on
-    -- its own: an admin approving from that screen is clicking yes on an empty
-    -- case file.
-    --
-    -- The cohort half must use the SAME definition as the counter — own,
-    -- free, at least one enrolment — or the list and the number drift again.
-    -- `demo_kind` lets the UI label a row rather than guess from a null.
-    SELECT * FROM (
-        SELECT 'session'      AS demo_kind,
-               s.id            AS session_id,
-               NULL            AS cohort_title,
-               s.student_id,
-               u.full_name     AS student_name,
-               s.status,
-               s.no_show,
-               s.created_at    AS booked_at,
-               s.updated_at    AS completed_at,
-               r.rating,
-               r.review_text,
-               r.created_at    AS reviewed_at
-          FROM `achiever_sessions` s
-          LEFT JOIN `users` u ON u.id = s.student_id
-          LEFT JOIN `achiever_reviews` r
-                 -- Match on context_id as well as session_id. The rating
-                 -- endpoint records a session review as
-                 -- (context_type='session', context_id=<session id>) and
-                 -- leaves session_id NULL, so joining on session_id alone
-                 -- found nothing: the student's rating existed and the admin
-                 -- deciding on probation saw "no feedback".
-                 ON r.is_active = 1
-                AND (r.session_id = s.id
-                     OR (r.context_type = 'session' AND r.context_id = s.id))
-         WHERE s.mentor_id = p_achiever_id
-           AND s.is_demo = 1
-
-        UNION ALL
-
-        -- One row per ENROLMENT, not per cohort: a demo cohort with three
-        -- students is three pieces of evidence, and each of them may have left
-        -- their own rating. Collapsing to one row per cohort would throw away
-        -- two of the three reviews the admin is there to read.
-        SELECT 'cohort'        AS demo_kind,
-               c.id            AS session_id,
-               c.title         AS cohort_title,
-               ce.user_id      AS student_id,
-               u.full_name     AS student_name,
-               c.status,
-               0               AS no_show,
-               ce.enrolled_at  AS booked_at,
-               c.updated_at    AS completed_at,
-               r.rating,
-               r.review_text,
-               r.created_at    AS reviewed_at
-          FROM `cohorts` c
-          JOIN `cohort_enrollments` ce ON ce.cohort_id = c.id
-          LEFT JOIN `users` u ON u.id = ce.user_id
-          -- Cohort feedback is recorded as (context_type='cohort',
-          -- context_id=<cohort id>) and is per STUDENT, so the rating must be
-          -- matched on the student too — otherwise every row in a three-student
-          -- cohort shows the same review.
-          LEFT JOIN `achiever_reviews` r
-                 ON r.is_active = 1
-                AND r.context_type = 'cohort'
-                AND r.context_id = c.id
-                AND r.user_id = ce.user_id
-         WHERE c.achiever_id = p_achiever_id
-           AND c.status = 'completed'
-           AND c.is_demo = 1
-    ) AS demos
-     ORDER BY booked_at;
-END$$
 
 
 -- ---------------------------------------------------------------------------
@@ -545,7 +374,7 @@ BEGIN
         (id, achiever_id, from_state, to_state, reason, actor_id, actor_role, created_at)
     SELECT UUID(), a.id, 'suspended',
            COALESCE((
-               SELECT e.from_state
+               SELECT IF(e.from_state = 'probation', 'active', e.from_state)
                  FROM `achiever_state_events` e
                 WHERE e.achiever_id = a.id
                   AND e.to_state = 'suspended'
@@ -565,7 +394,7 @@ BEGIN
     -- different column.
     UPDATE `achievers` a
        SET a.state = COALESCE((
-               SELECT e.from_state
+               SELECT IF(e.from_state = 'probation', 'active', e.from_state)
                  FROM `achiever_state_events` e
                 WHERE e.achiever_id = a.id
                   AND e.to_state = 'suspended'
@@ -577,7 +406,7 @@ BEGIN
            a.state_changed_at = UTC_TIMESTAMP(),
            a.suspended_until = NULL,
            a.is_active = (COALESCE((
-               SELECT e.from_state
+               SELECT IF(e.from_state = 'probation', 'active', e.from_state)
                  FROM `achiever_state_events` e
                 WHERE e.achiever_id = a.id
                   AND e.to_state = 'suspended'
@@ -604,7 +433,7 @@ DROP PROCEDURE IF EXISTS `sp_achiever_pre_suspension_state`$$
 CREATE PROCEDURE `sp_achiever_pre_suspension_state`(IN p_achiever_id CHAR(36))
 BEGIN
     SELECT COALESCE((
-        SELECT e.from_state
+        SELECT IF(e.from_state = 'probation', 'active', e.from_state)
           FROM `achiever_state_events` e
          WHERE e.achiever_id = p_achiever_id
            AND e.to_state = 'suspended'
@@ -699,11 +528,9 @@ BEGIN
         standing,
         payout_ready,
         suspended_until,
-        demo_sessions_done,
-        (state IN ('active','probation'))            AS can_be_listed,
+        (state = 'active')                           AS can_be_listed,
         (state = 'active')                           AS can_charge,
-        (state = 'probation')                        AS demo_only,
-        (state IN ('active','probation'))            AS can_take_bookings,
+        (state = 'active')                           AS can_take_bookings,
         (state IN ('active','suspended','banned'))   AS can_withdraw,
         (state = 'active')                           AS can_publish_content
       FROM `achievers`
@@ -726,90 +553,8 @@ DELIMITER $$
 -- achiever_documents differ in collation, and without it this comparison
 -- raises "Illegal mix of collations" on the RDS server default.
 -- ---------------------------------------------------------------------------
--- ---------------------------------------------------------------------------
--- Set the demo target absolutely, and put them back on demos to meet it.
---
--- The flow had no answer to its commonest case. An achiever clears three demos,
--- goes active, runs ten cohorts, and the reviews turn bad. Nothing could ask
--- them to run demo classes again:
---
---   * the route's `extend` decision computes needed_now + extra, so a target
---     could only ever go up. An achiever sitting on 13 because someone pressed
---     the button four times had no way back to 3.
---   * `extend` never writes `state` either, so on an ACTIVE achiever it would
---     raise the target and leave them active and still charging, which is worse
---     than refusing outright.
---
--- One procedure covers both: assign the target, clear the submission stamp so
--- the counter re-arms, and move them to probation when they are not already
--- there.
---
--- Deliberately NOT a cascade. Suspension already means "stop everything now"
--- and carries the refund logic; ban is final. This means "prove yourself
--- again": probation drops can_charge, so no NEW paid cohort or booking can be
--- created, while the cohorts and confirmed sessions students have already paid
--- for run to completion. Reviewers punish the achiever, not the students.
---
--- Banned is refused rather than silently reinstated -- it is the one state
--- sp_achiever_set_state also refuses to leave.
--- ---------------------------------------------------------------------------
+-- Retired with the demo-session workflow.
 DROP PROCEDURE IF EXISTS `sp_achiever_set_demo_target`$$
-CREATE PROCEDURE `sp_achiever_set_demo_target`(
-    IN p_achiever_id CHAR(36),
-    IN p_target      INT,
-    IN p_reason      VARCHAR(255),
-    IN p_actor_id    CHAR(36)
-)
-BEGIN
-    DECLARE v_state VARCHAR(20);
-    DECLARE v_done  INT DEFAULT 0;
-
-    SELECT state, IFNULL(demo_sessions_done, 0)
-      INTO v_state, v_done
-      FROM `achievers` WHERE id = p_achiever_id;
-
-    IF v_state IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ACHIEVER_NOT_FOUND';
-    END IF;
-
-    IF p_target IS NULL OR p_target < 1 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'TARGET_MUST_BE_POSITIVE';
-    END IF;
-
-    IF v_state = 'banned' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ACHIEVER_BANNED';
-    END IF;
-
-    UPDATE `achievers`
-       SET demo_sessions_required = p_target,
-           demo_submitted_at      = NULL,
-           updated_at             = UTC_TIMESTAMP(),
-           updated_by             = p_actor_id
-     WHERE id = p_achiever_id;
-
-    IF v_state <> 'probation' THEN
-        CALL sp_achiever_set_state(p_achiever_id, 'probation', p_reason,
-                                   NULL, p_actor_id, 'admin');
-    ELSE
-        -- Already in probation, so sp_achiever_set_state is not called and
-        -- nothing was recorded: History showed the target as 2 with no trace of
-        -- who moved it from 3, when, or why -- even though the form makes the
-        -- reason mandatory. This is the gate on when someone may start earning,
-        -- so the change is audited in its own right. from_state = to_state
-        -- marks it as a change WITHIN probation rather than a transition.
-        INSERT INTO `achiever_state_events`
-            (id, achiever_id, from_state, to_state, reason, actor_id, actor_role, created_at)
-        VALUES
-            (UUID(), p_achiever_id, 'probation', 'probation',
-             CONCAT('Demo target set to ', p_target, ' - ', IFNULL(p_reason, '')),
-             p_actor_id, 'admin', UTC_TIMESTAMP());
-    END IF;
-
-    SELECT v_state    AS from_state,
-           'probation' AS state,
-           v_done     AS demos_done,
-           p_target   AS demos_required;
-END$$
 
 DROP PROCEDURE IF EXISTS `sp_achiever_missing_documents`$$
 CREATE PROCEDURE `sp_achiever_missing_documents`(

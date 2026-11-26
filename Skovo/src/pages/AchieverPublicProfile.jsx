@@ -115,9 +115,8 @@ export default function AchieverPublicProfile() {
   const classes = data.classes || [];
   const upcoming = classes.filter((c) => ['live', 'upcoming'].includes(c.status));
   const past = classes.filter((c) => !['live', 'upcoming'].includes(c.status));
-  const demo = !a.can_charge;
   const role = [a.designation, a.company].filter((x, i, arr) => x && arr.indexOf(x) === i).join(' at ');
-  const mentor = { mentor_id: a.id, id: a.id, full_name: a.full_name, session_rate: a.session_rate, is_demo_achiever: demo };
+  const mentor = { mentor_id: a.id, id: a.id, full_name: a.full_name, session_rate: a.session_rate };
 
   // Not logged in: remember this profile, go to login, come back here after.
   const toLogin = () => { setReturnPath(`/achievers/${slug}`); navigate('/login'); };
@@ -198,9 +197,6 @@ export default function AchieverPublicProfile() {
               {a.trust_badge === 'verified' && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">✓ Verified</span>
               )}
-              {demo && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">New achiever · Free demo</span>
-              )}
               {a.rating > 0 && (
                 <span className="text-sm font-semibold text-amber-600 flex items-center gap-1">
                   <Star size={14} fill="currentColor" /> {a.rating}
@@ -223,7 +219,7 @@ export default function AchieverPublicProfile() {
                 className="flex-[2] sm:flex-none min-h-11 px-5 py-2 text-center text-sm font-bold text-white rounded-xl whitespace-nowrap transition-all hover:opacity-90"
                 style={{ backgroundColor: 'var(--accent)' }}>
                 {/* No price here: each 1-on-1 has its own, shown in the 1-on-1 tab and the booking window. */}
-                {demo ? 'Book a free demo' : 'Book a 1-on-1'}
+                Book a 1-on-1
               </button>
             )}
             <div className="flex-1 sm:flex-none [&>*]:h-full [&_button]:h-full">
@@ -268,10 +264,9 @@ export default function AchieverPublicProfile() {
               <p className="text-sm text-slate-500">No 1-on-1s open right now.</p>
             ) : (
               <div className="space-y-3">
-                {demo && <p className="text-xs text-emerald-700">Free demo sessions while this achiever is new.</p>}
                 {offerings.map((o) => {
-                  const price = demo ? 0 : Number(o.final_price ?? o.price ?? 0);
-                  const off = !demo && o.offer_type && Number(o.final_price) < Number(o.price);
+                  const price = Number(o.final_price ?? o.price ?? 0);
+                  const off = o.offer_type && Number(o.final_price) < Number(o.price);
                   return (
                     <div key={o.id} className="rounded-xl border border-slate-200 p-4">
                       <div className="flex items-start gap-3">

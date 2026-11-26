@@ -377,7 +377,7 @@ html.th-pink {
 
   /* ── Dark mode: semantic tints ────────────────────────────────
      The slate remaps above cover surfaces. They do not cover the tinted
-     panels — status pills, notification chips, probation banners, Pro
+     panels — status pills, notification chips, status banners, Pro
      upsells — which the app writes as bg-emerald-50 / text-red-600 /
      border-amber-200 and friends. Those are near-white by design, so on a
      #020617 page they rendered as glaring light blocks with dark text on
@@ -448,7 +448,7 @@ html.th-pink {
 
   /* 500 through 900. The 900 step is not decorative: it is what the app reaches
      for on the *heading* inside a tinted panel — "Your discount codes",
-     "Probation", "Payment failed" — 44 uses across eight families. Leaving it
+     "Suspended", "Payment failed" — 44 uses across eight families. Leaving it
      out meant the panel darkened around a heading that stayed near-black, so
      the most important line in the block was the least readable one (the Market
      coupon heading measured 3.34:1).

@@ -131,9 +131,6 @@ class AdminDashboardSummary(Resource):
                 {'key': 'documents',  'label': 'Achievers with documents to review',
                  'count': int(d.get('docs_to_review') or 0),
                  'href': '/skovo-platform-panel-admin/achiever-review'},
-                {'key': 'probation',  'label': 'Probations awaiting your decision',
-                 'count': int(d.get('probations_waiting') or 0),
-                 'href': '/skovo-platform-panel-admin/achiever-review'},
                 {'key': 'payouts',    'label': 'Payout requests pending',
                  'count': int(d.get('payouts_pending') or 0),
                  'amount': n('payouts_amount'),
@@ -168,7 +165,6 @@ class AdminDashboardSummary(Resource):
 
                 'totals': {
                     'achievers_active': int(d.get('achievers_active') or 0),
-                    'achievers_probation': int(d.get('achievers_probation') or 0),
                     'students': int(d.get('students_total') or 0),
                 },
             }, status=200, bool=True)
@@ -201,9 +197,7 @@ class AdminSidebarBadges(Resource):
                 SELECT
                   (SELECT COUNT(DISTINCT d.achiever_id)
                      FROM achiever_documents d JOIN achievers a ON a.id = d.achiever_id
-                    WHERE d.status = 'pending' AND a.state = 'pending')
-                  + (SELECT COUNT(*) FROM achievers
-                      WHERE state = 'probation' AND demo_submitted_at IS NOT NULL)  AS achiever_review,
+                    WHERE d.status = 'pending' AND a.state = 'pending')  AS achiever_review,
                   (SELECT COUNT(*) FROM payout_requests WHERE status = 'pending')   AS payouts
             """)).fetchone()
 

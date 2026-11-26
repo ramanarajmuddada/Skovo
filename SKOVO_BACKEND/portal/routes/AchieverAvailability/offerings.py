@@ -639,7 +639,7 @@ class BrowseOfferings(Resource):
                 page, per = 1, 20
 
             where = ["o.status = 'active'", "(o.available_to IS NULL OR o.available_to >= :today)",
-                     "IFNULL(m.status, 'active') = 'active'", "IFNULL(m.state, 'active') IN ('active', 'probation')"]
+                     "IFNULL(m.status, 'active') = 'active'", "IFNULL(m.state, 'active') = 'active'"]
             params = {'today': _ist_today()}
             if search:
                 where.append("(o.title LIKE :q OR o.about LIKE :q OR m.full_name LIKE :q OR m.company LIKE :q OR m.designation LIKE :q)")
@@ -653,7 +653,7 @@ class BrowseOfferings(Resource):
             if a.get('offer') in ('1', 'true'):
                 where.append("o.offer_type IS NOT NULL AND (o.offer_ends_at IS NULL OR o.offer_ends_at > UTC_TIMESTAMP())")
             rows = db.session.execute(text(
-                "SELECT o.*, m.full_name, m.designation, m.company, m.profile_image_url, m.state AS m_state,"
+                "SELECT o.*, m.full_name, m.designation, m.company, m.profile_image_url,"
                 "  (SELECT ROUND(AVG(r.rating), 1) FROM achiever_reviews r WHERE r.achiever_id = m.id AND r.is_active = 1) AS rating,"
                 "  (SELECT COUNT(*) FROM achiever_reviews r WHERE r.achiever_id = m.id AND r.is_active = 1) AS reviews"
                 "  FROM achiever_offerings o JOIN achievers m ON m.id = o.mentor_id"
@@ -665,8 +665,6 @@ class BrowseOfferings(Resource):
             for r in rows:
                 d = _offering_dict(r)
                 d.pop('meeting_link', None)
-                if r['m_state'] == 'probation':
-                    d['final_price'], d['demo'] = 0.0, True      # free demo while on probation
                 price = float(d['final_price'] or 0)
                 prices.append(price)
                 if (min_p is not None and price < min_p) or (max_p is not None and price > max_p):

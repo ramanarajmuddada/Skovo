@@ -75,16 +75,6 @@ function MentorCard({ mentor, onBook }) {
                 ⭐ {mentor.rating} <span className="text-slate-400 font-normal">({mentor.review_count})</span>
               </span>
             )}
-            {/* A probation achiever teaches free until an admin has read their
-                three demo reviews. Saying so turns a ₹0 price from a suspected
-                bug into an offer — and free is the reason a student tries
-                someone with no reviews yet. */}
-            {mentor.is_demo_achiever && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full
-                               bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Free demo session
-              </span>
-            )}
             {/* Earned nightly from ratings, repeat bookings and no-shows —
                 never set by hand, which is what makes it worth showing. */}
             {mentor.standing === 'spotlight' && (
@@ -208,8 +198,8 @@ export function BookModal({ mentor, onClose, onBooked, initialOffering }) {
   }, [mentor.mentor_id]);
 
   const offering = offerings.find((o) => o.id === picked);
-  // The price of the 1-on-1 picked (less a live offer); probation is free.
-  const rate = offering && !mentor.is_demo_achiever ? Number(offering.final_price ?? offering.price ?? 0) : 0;
+  // The price of the 1-on-1 picked (less a live offer).
+  const rate = offering ? Number(offering.final_price ?? offering.price ?? 0) : 0;
   const dayTimes = days.find((d) => d.date === day)?.times || [];
   const lenLabel = (m) => (m % 60 ? (m > 60 ? `${Math.floor(m / 60)} hr${m >= 120 ? "s" : ""} ${m % 60} min` : `${m} min`) : `${m / 60} hr${m > 60 ? 's' : ''}`);
   // Paise always in two digits: ₹559.20, never ₹559.2.
@@ -335,23 +325,14 @@ export function BookModal({ mentor, onClose, onBooked, initialOffering }) {
                   ⭐ {avgRating} <span className="text-slate-400 font-normal">({reviewCount} review{reviewCount > 1 ? 's' : ''})</span>
                 </p>
               )}
-              <p className="text-xs font-bold mt-0.5"
-                 style={mentor.is_demo_achiever ? { color: '#047857' } : { color: 'var(--accent)' }}>
-                {mentor.is_demo_achiever
-                  ? 'Free demo session'
-                  : offering
-                    ? (rate > 0 ? `${rupee(rate)} · ${lenLabel(offering.duration_min)}` : `Free · ${lenLabel(offering.duration_min)}`)
-                    : 'Pick a 1-on-1 below'}
+              <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--accent)' }}>
+                {offering
+                  ? (rate > 0 ? `${rupee(rate)} · ${lenLabel(offering.duration_min)}` : `Free · ${lenLabel(offering.duration_min)}`)
+                  : 'Pick a 1-on-1 below'}
               </p>
             </div>
           </div>
 
-          {/* One line. The badge already said "free"; this says why. */}
-          {mentor.is_demo_achiever && (
-            <p className="mt-2 text-xs text-emerald-700">
-              Free demo session — your review decides if they can charge.
-            </p>
-          )}
         </div>
 
         {/* Scrollable body */}
@@ -381,8 +362,8 @@ export function BookModal({ mentor, onClose, onBooked, initialOffering }) {
                 )}
                 {(showList || !offering) && offerings.map((o) => {
                   const on = picked === o.id;
-                  const price = mentor.is_demo_achiever ? 0 : Number(o.final_price ?? o.price ?? 0);
-                  const off = !mentor.is_demo_achiever && o.offer_type && Number(o.final_price) < Number(o.price);
+                  const price = Number(o.final_price ?? o.price ?? 0);
+                  const off = o.offer_type && Number(o.final_price) < Number(o.price);
                   return (
                     <button key={o.id} type="button" onClick={() => setPicked(o.id)} aria-pressed={on}
                             className={`w-full text-left rounded-xl border p-3 transition-colors ${on ? 'border-transparent ring-2' : 'border-slate-200 hover:border-slate-300'}`}

@@ -139,7 +139,6 @@ const BADGE_COLORS = {
   blocked:      'bg-red-50     text-red-600     border-red-200',
   banned:       'bg-red-50     text-red-600     border-red-200',
   rejected:     'bg-red-50     text-red-500     border-red-200',
-  probation:    'bg-blue-50    text-blue-700    border-blue-200',
   failed:       'bg-red-50     text-red-500     border-red-200',
   // misc
   open:         'bg-blue-50    text-blue-700    border-blue-200',

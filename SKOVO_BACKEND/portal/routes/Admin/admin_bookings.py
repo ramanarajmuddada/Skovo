@@ -216,7 +216,6 @@ def _session_dict(r):
         'status': r.get('status'),
         'payment_status': r.get('payment_status'),
         'amount': float(r.get('amount') or 0),
-        'is_demo': bool(r.get('is_demo')),
         'no_show': bool(r.get('no_show')),
         'note': r.get('note'),
         'starts_at': serialize_datetime(r.get('starts_at')),

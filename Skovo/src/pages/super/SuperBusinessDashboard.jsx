@@ -175,7 +175,7 @@ export default function SuperBusinessDashboard() {
                   delta={growth.sessions_growth_pct} />
           <Metric icon={ShieldCheck} label="Active achievers"
                   value={growth.achievers.active}
-                  sub={`${growth.achievers.probation} in probation · ${growth.achievers.pending} applying`} />
+                  sub={`${growth.achievers.pending} applying`} />
         </div>
       </div>
 

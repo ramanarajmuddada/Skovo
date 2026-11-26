@@ -144,7 +144,7 @@ function CohortClasses({ q, status, setCount }) {
   const paged = list.slice((page - 1) * perPage, page * perPage);
   const pager = <Pagination page={page} pages={pages} total={list.length} perPage={perPage}
                             onPage={setPage} onPerPage={(n) => { setPerPage(n); setPage(1); }} />;
-  const kind = (c) => (c.is_demo ? 'Demo' : c.is_free ? 'Free' : money(c.price));
+  const kind = (c) => (c.is_free ? 'Free' : money(c.price));
   const DeletedTag = ({ c }) => ((c.deleted || c.gone)
     ? <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 align-middle">Deleted</span> : null);
 
@@ -261,7 +261,7 @@ function Sessions({ q, status, setCount }) {
         <Modal isOpen onClose={() => setView(null)} title="1-on-1 session" size="sm">
           <div className="space-y-3">
             <Person title={view.student_name} gone={view.student_deleted} sub={view.student_email}
-                    chips={<><StatusBadge status={view.status} />{view.is_demo && <StatusBadge status="demo" />}{view.no_show && <StatusBadge status="no_show" label="No-show" />}</>} />
+                    chips={<><StatusBadge status={view.status} />{view.no_show && <StatusBadge status="no_show" label="No-show" />}</>} />
             <Block icon={Video} title="Session" lines={[
               ['Mentor', name(view.mentor_name, view.mentor_deleted)],
               ['When', view.starts_at ? when(view.starts_at) : null],
@@ -294,7 +294,6 @@ function Sessions({ q, status, setCount }) {
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                   <span className="inline-flex items-center gap-1"><Calendar size={12} /> {when(s.starts_at)}</span>
                   <span className="inline-flex items-center gap-1"><IndianRupee size={12} /> {money(s.amount)}</span>
-                  {s.is_demo && <span className="text-violet-600 font-semibold">Demo</span>}
                 </div>
               </button>
             ))}
@@ -315,7 +314,7 @@ function Sessions({ q, status, setCount }) {
                   {list.rows.map((s) => (
                     <tr key={s.id} onClick={() => setView(s)} className="hover:bg-slate-50/70 cursor-pointer">
                       <Td><p className="font-semibold text-slate-900">{name(s.student_name, s.student_deleted)}</p><p className="text-xs text-slate-400">{s.student_email || ''}</p></Td>
-                      <Td>{name(s.mentor_name, s.mentor_deleted)}{s.is_demo && <span className="ml-1.5 text-[11px] font-semibold text-violet-600">Demo</span>}</Td>
+                      <Td>{name(s.mentor_name, s.mentor_deleted)}</Td>
                       <Td className="whitespace-nowrap">{when(s.starts_at)}</Td>
                       <Td><StatusBadge status={s.status} /></Td>
                       <Td><StatusBadge status={s.payment_status} /></Td>

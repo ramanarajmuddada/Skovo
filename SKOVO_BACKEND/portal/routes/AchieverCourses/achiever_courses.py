@@ -608,11 +608,11 @@ class AchieverCoursePortalList(Resource):
 
             # ── Lifecycle gate ───────────────────────────────────────────────
             # A course is a paid product, so it needs `active` — the state an
-            # admin grants after reading the demo reviews.
+            # admin grants on verifying the achiever.
             err = T.require_state(
                 achiever_id, 'can_charge',
-                'Courses are a paid product, which opens once an admin has reviewed '
-                'your demo sessions and made your account active.')
+                'Courses are a paid product, which opens once an admin has verified '
+                'your account.')
             if err:
                 return err
 

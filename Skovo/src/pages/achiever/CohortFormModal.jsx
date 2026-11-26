@@ -178,7 +178,7 @@ export default function CohortFormModal({
       if (canCharge !== false && String(form.price).trim() === '') return 'Enter a price. Type 0 for a free class.';
       if (form.price !== '' && !(parseInt(form.price, 10) >= 0)) return 'Price must be 0 or more.';
       if (parseInt(form.price, 10) > 0 && canCharge === false) {
-        return 'This class runs free until your demos are approved.';
+        return 'Paid cohorts open once your account is verified.';
       }
       if (form.offer_type) {
         const p = parseInt(form.price, 10);
@@ -608,7 +608,7 @@ export default function CohortFormModal({
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
                   <p className="text-sm font-semibold text-amber-900">This class runs free</p>
                   <p className="text-xs text-amber-700 mt-1">
-                    Charging opens once an admin reviews your demo sessions.
+                    Paid cohorts open once your account is verified.
                   </p>
                 </div>
               )}

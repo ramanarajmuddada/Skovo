@@ -17,7 +17,7 @@ logger = logging.getLogger('skovo')
 
 
 def _mine():
-    """The achiever, if their state unlocks Refer & Earn (probation or active).
+    """The achiever, if their state unlocks Refer & Earn (active).
     A pending achiever's link would not resolve, so the page is closed too."""
     claims = get_jwt()
     if claims.get('role') != 'mentor':

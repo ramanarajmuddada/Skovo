@@ -407,7 +407,7 @@ def effective_cohort_status(c) -> str:
         return 'upcoming'
     # A class nobody ended stayed "Live now" for months. Six hours past its
     # booked end it is over, whoever forgot the button; the stored row is left
-    # alone, so demo credit still needs a real End session.
+    # alone, so completion still needs a real End session.
     end = c.session_date + timedelta(minutes=(getattr(c, 'duration_minutes', None) or 90))
     if now > end + timedelta(hours=6):
         return 'completed'

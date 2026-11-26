@@ -8,8 +8,8 @@ const rupee = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFract
 const when = (s) => (s ? new Date(s).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—');
 
 /** One achiever's cohorts, and one cohort's students, payments and reviews.
-    Used by the Cohorts, Demos and Reviews tabs on Admin > Achievers.
-    filter: 'all' | 'demo' (free cohorts) | 'reviewed'. */
+    Used by the Cohorts and Reviews tabs on Admin > Achievers.
+    filter: 'all' | 'reviewed'. */
 export default function AchieverCohortsPanel({ achieverId, filter = 'all', startTab = 'students' }) {
   const [rows, setRows] = useState(null);
   const [open, setOpen] = useState(null);
@@ -22,9 +22,9 @@ export default function AchieverCohortsPanel({ achieverId, filter = 'all', start
 
   if (open) return <CohortDetail achieverId={achieverId} cohort={open} startTab={startTab} onBack={() => setOpen(null)} />;
   if (!rows) return <p className="text-sm text-slate-400">Loading…</p>;
-  const list = rows.filter((c) => (filter === 'demo' ? c.is_demo : filter === 'reviewed' ? c.reviews > 0 : true));
+  const list = rows.filter((c) => (filter === 'reviewed' ? c.reviews > 0 : true));
   if (!list.length) {
-    return <p className="text-sm text-slate-500 py-4 text-center">{filter === 'demo' ? 'No demo cohorts yet.' : filter === 'reviewed' ? 'No reviews yet.' : 'No cohorts yet.'}</p>;
+    return <p className="text-sm text-slate-500 py-4 text-center">{filter === 'reviewed' ? 'No reviews yet.' : 'No cohorts yet.'}</p>;
   }
   return (
     <div className="space-y-2">
@@ -39,7 +39,7 @@ export default function AchieverCohortsPanel({ achieverId, filter = 'all', start
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {when(c.session_date)} · {c.joined}/{c.total_seats ?? '∞'} joined · {c.attended} attended
-            · {c.is_demo ? 'Demo' : c.is_free ? 'Free' : `${rupee(c.price)} · collected ${rupee(c.collected)}`}
+            · {c.is_free ? 'Free' : `${rupee(c.price)} · collected ${rupee(c.collected)}`}
             {c.reviews ? ` · ${c.avg_rating} ★ (${c.reviews})` : ''}
           </p>
         </button>

@@ -278,7 +278,7 @@ class AchieverDossier(Resource):
 # Removed on purpose: PUT /achiever-trust/<id>/tier.
 #
 # Setting a trust tier was the old capability model. Capability now follows the
-# lifecycle state — pending / probation / active / suspended / banned — set
+# lifecycle state — pending / active / suspended / banned — set
 # through /achiever-lifecycle/<id>/..., which records a reason and writes an
 # audit event for every transition.
 #

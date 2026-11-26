@@ -2,7 +2,7 @@ import FormSelect from '../../components/ui/FormSelect';
 import React, { useEffect, useState } from 'react';
 import {
   Loader2, Trash2, Check, ShieldCheck, AlertCircle, FileText, Send,
-  ExternalLink, ChevronDown, Star, } from 'lucide-react';
+  ExternalLink, ChevronDown, } from 'lucide-react';
 import { achieverApi } from '../../services/api';
 // No PageHeader here on purpose: the layout header already shows "Verification",
 // and the tier card below is this screen's hero. A second title would repeat it.
@@ -29,137 +29,16 @@ import { ConfirmModal } from '../../components/ui/TableComponents';
 // exists — every achiever resolved to 0 and read "Complete your application".
 const STATE_BLURB = {
   pending:   'Upload your documents, then an admin reviews them.',
-  probation: 'You are listed. Sessions are free until an admin reads the student reviews.',
-  active:    'Fully approved. You can charge for sessions and cohorts.',
+  active:    'Verified. You can create paid cohorts and charge for sessions.',
   suspended: 'Your account is suspended. See the reason above.',
   banned:    'This account is closed.',
 };
 
 const STATE_LABEL = {
-  pending: 'Pending review', probation: 'On probation', active: 'Active',
+  pending: 'Pending review', active: 'Active',
   suspended: 'Suspended', banned: 'Closed',
 };
 
-function DemoStars({ value }) {
-  if (value == null) return <span className="text-slate-400 text-sm">Not rated</span>;
-  return (
-    <span className="inline-flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map(n => (
-        <Star key={n} size={14}
-              className={n <= Math.round(value) ? 'text-amber-500 fill-amber-500' : 'text-slate-200'} />
-      ))}
-      <span className="text-sm font-semibold text-slate-700 ml-1">{Number(value).toFixed(1)}</span>
-    </span>
-  );
-}
-
-/** Same student reviews an admin reads. Read-only. */
-function DemoReviewsPanel({ done, required, reviews, reason, approved = false }) {
-  const sessions = reviews?.sessions || [];
-  // The server sends one row per student. A demo cohort with four students is
-  // still one demo, so group the rows: one card per demo, its reviews inside.
-  const demos = [];
-  sessions.forEach((s) => {
-    const key = s.session_id || s.cohort_title;
-    let d = demos.find((x) => x.key === key);
-    if (!d) { d = { key, title: s.cohort_title, kind: s.demo_kind, at: s.completed_at, rows: [] }; demos.push(d); }
-    d.rows.push(s);
-  });
-  const summary = reviews?.summary || {};
-  const needed = required || 3;
-  const have = done ?? summary.completed ?? 0;
-  const pct = needed > 0 ? Math.min(100, (have / needed) * 100) : 0;
-
-  return (
-    <div className="bg-white rounded-2xl border border-amber-200 p-4 sm:p-6 space-y-4">
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Demo sessions</p>
-        <h3 className="font-bold text-slate-900 mt-0.5">{have} of {needed} complete</h3>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Students review after class. Only completed sessions count — no-shows do not.
-          An admin reads the same reviews you see here.
-        </p>
-      </div>
-
-      <div className="h-2 rounded-full bg-amber-100 overflow-hidden">
-        <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${pct}%` }} />
-      </div>
-
-      {reason && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">From the admin</p>
-          <p className="text-sm text-amber-900 mt-1 leading-relaxed">{reason}</p>
-        </div>
-      )}
-
-      {have >= needed && (
-        <p className="text-sm text-amber-900 font-medium">
-          {approved
-            ? 'Demo approved. You can now charge for sessions and cohorts.'
-            : <>{needed === 1 ? 'Your demo is done.' : `All ${needed} demos are done.`} An admin is reading the reviews and will be in touch.</>}
-        </p>
-      )}
-
-      {summary.no_shows > 0 && (
-        <p className="text-xs text-slate-500">
-          {summary.no_shows} no-show{summary.no_shows === 1 ? '' : 's'} — not counted toward {needed}.
-        </p>
-      )}
-
-      {sessions.length === 0 ? (
-        <p className="text-sm text-slate-400 italic">No demo sessions booked yet. Set your availability so students can find you.</p>
-      ) : (
-        <div className="space-y-3">
-          {demos.map((d, i) => {
-            const rated = d.rows.filter((r) => r.rating != null);
-            const avg = rated.length ? rated.reduce((a, r) => a + Number(r.rating), 0) / rated.length : null;
-            return (
-              <div key={d.key || i} className="rounded-xl border border-slate-200 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Demo {i + 1}{d.kind === 'cohort' ? ' · Cohort' : d.kind === 'session' ? ' · 1-on-1' : ''}
-                    </p>
-                    <p className="font-semibold text-slate-900 mt-0.5 break-words">{d.title || d.rows[0]?.student_name || 'Demo'}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {d.at ? new Date(d.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not completed'}
-                      {' · '}{d.rows.length} student{d.rows.length === 1 ? '' : 's'}
-                    </p>
-                  </div>
-                  {avg != null && (
-                    <div className="text-right">
-                      <DemoStars value={Math.round(avg * 10) / 10} />
-                      <p className="text-xs text-slate-400 mt-1">{rated.length} review{rated.length === 1 ? '' : 's'}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
-                  {d.rows.map((s, j) => (
-                    <div key={s.student_id || j} className="py-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-800 min-w-0 truncate">{s.student_name || 'Student'}</p>
-                        <span className="text-xs text-slate-500 shrink-0">{s.rating != null ? `${s.rating} / 5` : 'No rating'}</span>
-                      </div>
-                      {s.no_show && <p className="text-xs text-red-600 mt-1">Marked as a no-show.</p>}
-                      {s.review_text
-                        ? <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap break-words">{s.review_text}</p>
-                        : <p className="text-xs text-slate-400 italic mt-1">No written feedback.</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Completion ring ──────────────────────────────────────────────────────
- * The score comes from the same procedure that gates submit, so the number and
- * the rule can never disagree.
- */
 function ProgressRing({ percent }) {
   const r = 26;
   const circ = 2 * Math.PI * r;
@@ -277,7 +156,7 @@ function GuidelineSections({ guidelines }) {
       ))}
       </div>
 
-      {/* Still rendered because the probation and active states carry their own
+      {/* Still rendered because the active state carries its own
           note. The pending one was dropped on the server, not here. */}
       {note && (
         <p className="mt-6 text-xs text-slate-500 leading-relaxed bg-slate-50
@@ -980,22 +859,6 @@ export default function AchieverApplication() {
             </div>
           ))}
         </div>
-      )}
-  
-      {/* What the admin asked for sits right under "Waiting on you"; the
-          demo progress follows. */}
-      {(lifecycle === 'probation' || lifecycle === 'active') && (
-        <DemoReviewsPanel
-          done={state.demos_done}
-          required={state.demos_required}
-          reviews={state.demo_reviews}
-          approved={lifecycle === 'active'}
-          reason={lifecycle === 'probation'
-            && state.state_reason
-            && !/^Application approved/i.test(state.state_reason)
-            ? state.state_reason
-            : null}
-        />
       )}
   
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-4">
