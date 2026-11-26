@@ -112,6 +112,7 @@ const AdminPayments       = /* @__PURE__ */ lazy(() => import('./pages/admin/Adm
 const AdminTasks          = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminTasks'));
 const AdminReadinessRules = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminReadinessRules'));
 const AdminProfile        = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminProfile'));
+const AdminNotifications  = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminNotifications'));
 const AdminAnalytics      = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminCGColleges     = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGColleges'));
 const AdminCGEntranceExams = /* @__PURE__ */ lazy(() => import('./pages/admin/AdminCGEntranceExams'));
@@ -493,6 +494,7 @@ function App() {
             <Route path="audit"            element={<AdminAudit />} />
             <Route path="error-logs"       element={<AdminErrorLogs />} />
             <Route path="profile"          element={<AdminProfile />} />
+            <Route path="notifications"    element={<AdminNotifications />} />
             {/* v1-hidden: <Route path="cg-colleges"       element={<AdminCGColleges />} /> */}
             {/* v1-hidden: <Route path="cg-entrance-exams" element={<AdminCGEntranceExams />} /> */}
             {/* v1-hidden: <Route path="cg-scholarships"   element={<AdminCGScholarships />} /> */}

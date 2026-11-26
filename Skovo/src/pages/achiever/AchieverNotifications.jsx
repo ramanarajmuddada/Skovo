@@ -4,7 +4,7 @@ import {
   Bell, CalendarCheck, IndianRupee, ShieldCheck, Info, CheckCheck, Loader2, ChevronRight, MailOpen, Mail,
 } from 'lucide-react';
 import { achieverApi } from '../../services/api';
-import { routeFor } from '../../utils/achieverNotifRoute';
+import { routeFor as achieverRouteFor } from '../../utils/achieverNotifRoute';
 import {
   PageHeader, EmptyState, ErrorState, Skeleton, useToast,
 } from '../../components/ui/index.jsx';
@@ -114,7 +114,13 @@ const timeOf = (iso) => {
   return `${d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, ${d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`;
 };
 
-export default function AchieverNotifications() {
+/** The admin console renders this same screen with its own API client and
+ *  links; every prop defaults to the achiever portal. */
+export default function AchieverNotifications({
+  client = achieverApi, routeFor = achieverRouteFor,
+  emptyText = 'Booking requests, cancellations and payout updates land here.',
+  onReadChange, refreshEvent, top = null, className = '',
+}) {
   const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed]   = useState(false);
@@ -127,7 +133,7 @@ export default function AchieverNotifications() {
   const navigate = useNavigate();
 
   // Paged: page 1 replaces the list, later pages append ("Load more").
-  const fetchPage = useCallback((p) => achieverApi.get('/notifications/', { page: p, per_page: PER_PAGE })
+  const fetchPage = useCallback((p) => client.get('/notifications/', { page: p, per_page: PER_PAGE })
     .then(({ data }) => {
       if (!data.bool) throw new Error('notifications unavailable');
       const r = data.response;
@@ -135,7 +141,7 @@ export default function AchieverNotifications() {
       setItems((cur) => (p === 1 ? rows : [...cur, ...rows.filter((x) => !cur.some((c) => c.id === x.id))]));
       setHasMore(Boolean(r.has_more));
       setPage(p);
-    }), []);
+    }), [client]);
 
   const loadMore = () => {
     setMore(true);
@@ -153,11 +159,17 @@ export default function AchieverNotifications() {
   }, [fetchPage]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!refreshEvent) return undefined;
+    window.addEventListener(refreshEvent, load);
+    return () => window.removeEventListener(refreshEvent, load);
+  }, [refreshEvent, load]);
 
   const markAllRead = async () => {
     setBusy(true);
     try {
-      await achieverApi.post('/notifications/mark-all-read', {});
+      await client.post('/notifications/mark-all-read', {});
+      onReadChange?.();
       // Optimistic locally too, so the list settles even if the reload is slow.
       setItems(list => list.map(n => ({ ...n, is_read: true })));
       load();
@@ -170,7 +182,7 @@ export default function AchieverNotifications() {
 
   const markUnread = async (id) => {
     setItems(list => list.map(n => (n.id === id ? { ...n, is_read: false } : n)));
-    try { await achieverApi.patch(`/notifications/${id}/unread`, {}); }
+    try { await client.patch(`/notifications/${id}/unread`, {}); onReadChange?.(); }
     catch { toast.error("Couldn't mark it unread"); setItems(list => list.map(n => (n.id === id ? { ...n, is_read: true } : n))); }
   };
 
@@ -184,14 +196,14 @@ export default function AchieverNotifications() {
   const markRead = async (id) => {
     setItems(list => list.map(n => (n.id === id ? { ...n, is_read: true } : n)));
     // PATCH, not POST — mark-all-read is the POST one.
-    try { await achieverApi.patch(`/notifications/${id}/read`, {}); } catch { /* ignore */ }
+    try { await client.patch(`/notifications/${id}/read`, {}); onReadChange?.(); } catch { /* ignore */ }
   };
 
   const unread = items.filter(n => !n.is_read).length;
   const shown = filter === 'unread' ? items.filter(n => !n.is_read) : items;
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${className}`}>
       <PageHeader
         title="Notifications"
         subtitle={unread > 0 ? `${unread} unread` : 'You are all caught up'}
@@ -218,6 +230,7 @@ export default function AchieverNotifications() {
           </div>
         }
       />
+      {top}
 
       {loading ? (
         <div className="space-y-2">
@@ -238,7 +251,7 @@ export default function AchieverNotifications() {
           <EmptyState
             icon={Bell}
             title={filter === 'unread' ? 'Nothing unread' : 'No notifications yet'}
-            subtitle="Booking requests, cancellations and payout updates land here."
+            subtitle={emptyText}
           />
         </div>
       ) : (

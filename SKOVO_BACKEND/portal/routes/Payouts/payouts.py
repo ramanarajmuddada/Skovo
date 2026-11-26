@@ -9,6 +9,7 @@ from portal.models import db
 from sqlalchemy import text
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.helpers import field_limits as FL
+from portal.helpers.admin_notify import tell_admins
 from . import ns, logger
 
 request_parser = reqparse.RequestParser()
@@ -285,6 +286,10 @@ class AchieverPayoutRequest(Resource):
             except Exception as _al:
                 db.session.rollback()
                 logger.warning(f"payout request alert failed: {_al}")
+            tell_admins('Payout request',
+                        f"{achiever.get('full_name') or 'An achiever'} asked for "
+                        f"₹{amount:,.2f} by {'UPI' if method == 'upi' else 'bank transfer'}.",
+                        reference_type='payout_request', reference_id=payout['id'])
             logger.info(f"Achiever {achiever_id} requested payout {payout['id']} for {amount} (via sp_achiever_payout_request)")
             return jsonify(response=_payout_dict(payout), status=201, bool=True)
         except Exception as e:

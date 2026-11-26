@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Tabs } from '../../components/admin/v1/AdminV1Kit';
 import { LifeBuoy, Plus, Pencil, Trash2, Search, CheckCircle, X, SlidersHorizontal, Contact, Building2 } from 'lucide-react';
 import CompanyDetails from '../../components/admin/CompanyDetails';
@@ -88,7 +89,11 @@ function Pill({ status }) {
 }
 
 export default function AdminSupport() {
-  const [tab, setTab] = useState('contacts');
+  // ?tab=issues is how a notification opens the Issues tab directly.
+  const location = useLocation();
+  const wanted = new URLSearchParams(location.search).get('tab') === 'issues' ? 'issues' : null;
+  const [tab, setTab] = useState(wanted || 'contacts');
+  useEffect(() => { if (wanted) setTab(wanted); }, [wanted, location.key]);
   const [toast, setToast] = useState({ msg: '', ok: true });
   const flash = useCallback((msg, ok = true) => {
     setToast({ msg, ok });

@@ -26,10 +26,12 @@ from flask import jsonify, request
 from flask_restx import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
+from sqlalchemy import text
 from portal.models import db
 from portal.helpers.sp import call_proc, call_proc_one
 from portal.routes.AchieverApplication.achiever_lifecycle import guidelines_for
 from portal.helpers import trust as T
+from portal.helpers.admin_notify import tell_admins, achiever_name
 from . import ns, logger
 
 
@@ -324,6 +326,15 @@ class ApplicationDocuments(Resource):
             )
             db.session.commit()
             logger.info(f"Achiever {achiever_id} attached {doc_type} evidence")
+            # Before submission this is just filling in the form; the submit
+            # tells the admin. Afterwards it is something new for them to review.
+            status = db.session.execute(text(
+                "SELECT application_status FROM achievers WHERE id = :i"), {'i': achiever_id}).scalar()
+            if status in ('submitted', 'approved'):
+                tell_admins('New achiever document',
+                            f"{achiever_name(achiever_id)} uploaded a document for review.",
+                            reference_type='achiever_document', reference_id=achiever_id,
+                            once_while_unread=True)
             return jsonify(response={'document': _doc_dict(row or {})}, status=201, bool=True)
         except Exception as e:
             db.session.rollback()
@@ -461,6 +472,9 @@ class ApplicationSubmit(Resource):
                 }, status=400, bool=False)
 
             logger.info(f"Achiever {achiever_id} submitted application for review")
+            tell_admins('Achiever verification request',
+                        f"{achiever_name(achiever_id)} submitted their application for review.",
+                        reference_type='achiever_application', reference_id=achiever_id)
             # CRM: achiever 'Submitted' pipeline stage — same bridge the
             # 'Applied' event already uses at registration.
             try:

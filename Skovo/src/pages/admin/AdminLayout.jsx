@@ -14,8 +14,9 @@ import {
   LogOut, Menu, X, Shield, MailOpen, ScrollText,
   UserCheck, CalendarCheck, IndianRupee, CheckSquare, Sliders, ChevronRight, User, Brain, Database, AlertTriangle, Crown, ShoppingBag, Gauge, ShieldAlert,
   ClipboardList, FileText, BarChart2, Share2, MessageSquare, Ticket, Upload,
-  ClipboardCheck, MapPin, LifeBuoy, Layers, Flame, Trophy, Sparkles, Wallet, Building,
+  ClipboardCheck, MapPin, LifeBuoy, Layers, Flame, Trophy, Sparkles, Wallet, Building, Bell,
 } from 'lucide-react';
+import AdminNotifBell from '../../components/admin/AdminNotifBell';
 
 function isCollegeSubdomain() {
   const host = window.location.hostname;
@@ -29,7 +30,10 @@ function isCollegeSubdomain() {
 const NAV_FULL_GROUPS = [
   {
     label: 'Overview',
-    items: [{ to: '/skovo-platform-panel-admin', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+    items: [
+      { to: '/skovo-platform-panel-admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/skovo-platform-panel-admin/notifications', label: 'Notifications', icon: Bell },
+    ],
   },
   {
     label: 'Management',
@@ -189,6 +193,7 @@ function gateNav(groups, adminRole) {
       ...g,
       items: g.items.filter((it) => {
         if (it.end) return true;   // Dashboard is always visible
+        if (it.to.endsWith('/notifications')) return true;
         const area = AREA_BY_PATH[it.to] || 'content';
         return allowed.includes(area);
       }),
@@ -234,6 +239,7 @@ const NAV_COLLEGE_GROUPS = [
 
 const ADMIN_PAGE_TITLES = {
   '/skovo-platform-panel-admin':                 'Dashboard',
+  '/skovo-platform-panel-admin/notifications':   'Notifications',
   '/skovo-platform-panel-admin/users':           'Students',
   '/skovo-platform-panel-admin/cohorts':         'Cohorts',
   '/skovo-platform-panel-admin/bookings':        'Bookings',
@@ -603,6 +609,7 @@ export default function AdminLayout() {
             <span className="text-sm font-semibold text-slate-900">{pageTitle}</span>
           </div>
           <div className="flex-1" />
+          <AdminNotifBell />
           <ThemeDropdown dark={false} />
           {/* Avatar with dropdown — Profile + Sign Out */}
           <UserMenu user={user} />

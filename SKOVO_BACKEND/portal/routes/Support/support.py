@@ -19,6 +19,7 @@ from portal.helpers.support import (
     is_email, portal_from_jwt, serialize_contact, serialize_issue, support_inbox,
 )
 from portal.models import db
+from portal.helpers.admin_notify import tell_admins, achiever_name
 
 from . import ns, logger
 
@@ -213,6 +214,10 @@ class SupportIssueCreate(Resource):
                 _mirror_new_issue(issue, name, email)
             except Exception as mail_err:
                 logger.warning(f"support issue email mirror failed: {mail_err}")
+            if portal == 'achiever':
+                tell_admins('Achiever support request',
+                            f"{name or 'An achiever'} raised an issue: {subject}",
+                            reference_type='support_issue', reference_id=issue_id)
 
             return jsonify(response={'issue': issue}, status=200, bool=True)
         except Exception as e:
@@ -296,6 +301,11 @@ class SupportIssueMessages(Resource):
                                                  f"{row.get('contact_email') or 'The user'} wrote:\n\n{body or '(file attached)'}"))
             except Exception as mail_err:
                 logger.warning(f"support chat mail failed: {mail_err}")
+            if row.get('portal') == 'achiever':
+                tell_admins('New message from an achiever',
+                            f"{achiever_name(get_jwt_identity())} replied on: {row.get('subject')}",
+                            reference_type='support_issue', reference_id=issue_id,
+                            once_while_unread=True)
             return jsonify(response={'message': msg, 'reopened': row.get('status') == 'solved'}, status=200, bool=True)
         except Exception as e:
             db.session.rollback()
@@ -359,6 +369,10 @@ class SupportIssueReopen(Resource):
                                                  f"{row.get('contact_email') or 'The user'} reopened it."))
             except Exception as mail_err:
                 logger.warning(f"support reopen mail failed: {mail_err}")
+            if portal == 'achiever':
+                tell_admins('Achiever reopened an issue',
+                            f"{achiever_name(user_id)} reopened: {row.get('subject')}",
+                            reference_type='support_issue', reference_id=issue_id)
             return jsonify(response={'message': 'Reopened. Support will look again.'}, status=200, bool=True)
         except Exception as e:
             db.session.rollback()

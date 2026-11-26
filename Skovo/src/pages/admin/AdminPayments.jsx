@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import MoneySummary from '../../components/admin/MoneySummary';
 import PayoutsAdmin from '../../components/admin/PayoutsAdmin';
 import { Tabs } from '../../components/admin/v1/AdminV1Kit';
@@ -55,6 +56,11 @@ function PaymentCard({ p, fmt }) {
 export default function AdminPayments() {
   // ?tab=payouts (dashboard "Payout requests pending") opens the payouts tab.
   const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'payouts' ? 'payouts' : 'payments'));
+  // A payout notification opened while already on this screen switches tabs too.
+  const location = useLocation();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'payouts') setTab('payouts');
+  }, [location.key, location.search]);
   const [payments,   setPayments]   = useState([]);
   const [stats,      setStats]      = useState({});
   const [loading,    setLoading]    = useState(true);
