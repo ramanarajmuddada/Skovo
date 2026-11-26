@@ -1,4 +1,5 @@
 import useMobileCardTables from '../../hooks/useMobileCardTables';
+import { goHomeAfterSignOut } from '../../utils/signOut';
 import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import PageTransition from '../ui/PageTransition';
@@ -243,10 +244,8 @@ function UserMenu({ user }) {
   async function handleSignOut() {
     setOpen(false);
     await logout();
-    // Home, not the login form. A student signing out is leaving, not switching
-    // accounts — dropping them on "Welcome back" asks them to do the one thing
-    // they just chose not to do. The landing page gives them a reason to return.
-    navigate('/');
+    // Home, not the login form: someone signing out is leaving.
+    goHomeAfterSignOut();
   }
 
   const initial = user?.full_name?.charAt(0)?.toUpperCase() || 'U';

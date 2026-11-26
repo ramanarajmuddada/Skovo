@@ -425,8 +425,9 @@ class CohortDetail(Resource):
             # The raw status stays, so a screen can tell "never started" from
             # "started and unpaid" and offer to resume the checkout.
             data['enrollment_status'] = enrollment.get('payment_status') if enrollment else None
-            # Only a student who checked in may rate the class (the code is the proof).
             data['attended'] = bool(enrollment and enrollment.get('attended') and is_enrolled)
+            from portal.routes.AchieverReviews.achiever_reviews import cohort_review_allowed
+            data['can_review'] = cohort_review_allowed(c, enrollment)
 
             # Time-gate the join: a session is joinable while live, or from 15 min
             # before its start.

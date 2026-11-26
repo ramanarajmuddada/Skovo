@@ -2525,6 +2525,41 @@ class AchieverPortalCohortFeedback(Resource):
             return jsonify(response={'message': 'Internal Server Error', 'error_id': error_id}, status=500, bool=False)
 
 
+@_achievers_ns.route('/portal/reviews')
+class AchieverPortalReviews(Resource):
+    @_achievers_ns.doc(description='Achiever: every rating and review students have left them.')
+    @jwt_required()
+    def get(self):
+        try:
+            if get_jwt().get('role') != 'mentor':
+                return jsonify(response={'message': 'Achiever access only.'}, status=403, bool=False)
+            # Own reviews only: the id comes from the token, never the request.
+            rows = db.session.execute(text(
+                "SELECT r.id, r.rating, r.review_text, r.context_type, r.created_at,"
+                "       u.full_name, c.title"
+                "  FROM achiever_reviews r"
+                "  LEFT JOIN users u ON u.id = r.user_id"
+                "  LEFT JOIN cohorts c ON r.context_type = 'cohort' AND c.id = r.context_id"
+                " WHERE r.achiever_id = :a AND r.is_active = 1"
+                " ORDER BY r.created_at DESC LIMIT 500"), {'a': get_jwt_identity()}).mappings().all()
+            ratings = [int(r['rating']) for r in rows if r['rating'] is not None]
+            return jsonify(response={
+                'reviews': [{
+                    'id': r['id'], 'rating': r['rating'], 'review_text': r['review_text'],
+                    'context_type': r['context_type'], 'cohort_title': r['title'],
+                    'student_name': r['full_name'] or 'Student',
+                    'created_at': serialize_datetime(r['created_at']) if r['created_at'] else None,
+                } for r in rows],
+                'count': len(ratings),
+                'avg_rating': round(sum(ratings) / len(ratings), 1) if ratings else None,
+                'breakdown': {str(n): ratings.count(n) for n in range(1, 6)},
+            }, status=200, bool=True)
+        except Exception as e:
+            error_id = capture_error(e)
+            logger.error(f"GET /achievers/portal/reviews: {e}")
+            return jsonify(response={'message': 'Internal Server Error', 'error_id': error_id}, status=500, bool=False)
+
+
 @_achievers_ns.route('/portal/cohorts/<string:cohort_id>/attendance')
 class AchieverCohortAttendance(Resource):
     @_achievers_ns.doc(description=(

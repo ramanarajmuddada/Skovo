@@ -155,6 +155,14 @@ export function onScoreChanged(handler) {
 let isRefreshing = false;
 let refreshQueue = [];
 
+// An expired student session found while someone is just on the home page (for
+// instance right after signing out of the Achiever portal) is dropped quietly;
+// the public page must not turn into the student login by itself.
+function leaveForLogin() {
+  if (window.location.pathname === '/') { localStorage.removeItem('user'); return; }
+  window.location.href = '/login';
+}
+
 async function refreshAccessToken() {
   const { refreshToken } = getTokens();
   if (!refreshToken) throw new Error('No refresh token');
@@ -214,7 +222,7 @@ async function request(endpoint, options = {}) {
       refreshQueue.forEach((p) => p.reject(err));
       refreshQueue = [];
       clearTokens();
-      window.location.href = '/login';
+      leaveForLogin();
       throw err;
     } finally {
       isRefreshing = false;
@@ -399,7 +407,7 @@ export const api = {
       fresh = await refreshAccessToken();
     } catch (err) {
       clearTokens();
-      window.location.href = '/login';
+      leaveForLogin();
       throw err;
     }
     return xhrUpload(endpoint, formData, { ...opts, token: fresh });

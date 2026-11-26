@@ -186,7 +186,7 @@ function RatingModal({ session, onClose, onRated }) {
     try {
       const { data } = await api.post(`/achiever-reviews/${session.mentor_id}`, {
         rating, review_text: text.trim() || null,
-        context_type: 'session', context_id: session.id,
+        context_type: session.kind === 'cohort' ? 'cohort' : 'session', context_id: session.id,
       });
       if (data.bool) onRated(session.id);
       else setError(data.response?.message || 'Failed to submit rating.');
@@ -199,12 +199,14 @@ function RatingModal({ session, onClose, onRated }) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="p-5 sm:p-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-          <h3 className="font-bold text-slate-900 text-lg mb-1">Rate your session</h3>
+          <h3 className="font-bold text-slate-900 text-lg mb-1">{session.kind === 'cohort' ? 'Rate this cohort' : 'Rate your session'}</h3>
           {/* Names the session being rated. Someone with several sessions in a
               week cannot otherwise tell which one this modal is about, and a
               rating attached to the wrong achiever is not correctable by them. */}
           <p className="text-xs text-slate-500 mb-4">
-            {sessionContext(session)}
+            {session.kind === 'cohort'
+              ? `${session.title}${session.mentor_name ? ` with ${session.mentor_name}` : ''}`
+              : sessionContext(session)}
           </p>
 
           <div className="flex items-center justify-center gap-1.5 mb-5">
@@ -456,8 +458,9 @@ export default function Bookings() {
     api.get('/achiever-reviews/mine')
       .then(({ data }) => {
         if (!data?.bool) return;
+        // Keyed by the session id or the cohort id the review is about.
         setRatedIds((data.response.reviews || [])
-          .filter(r => r.context_type === 'session' && r.context_id)
+          .filter(r => ['session', 'cohort'].includes(r.context_type) && r.context_id)
           .map(r => r.context_id));
       })
       .catch(() => {});   // A failed lookup just means no badges; not worth a toast.
@@ -561,6 +564,12 @@ export default function Bookings() {
     });
   };
 
+  const rateCohort = (b) => setRateSession({
+    kind: 'cohort', id: b.cohort_id, mentor_id: b.achiever_id,
+    title: b.cohort_title, mentor_name: b.achiever?.full_name,
+  });
+  const toRate = (bookings || []).filter((b) => b.can_review && !ratedIds.includes(b.cohort_id));
+
   const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '—';
 
   /** Cohorts and 1-on-1 sessions as one chronological list.
@@ -639,7 +648,7 @@ export default function Bookings() {
       )}
       {rateSession && (
         <RatingModal session={rateSession} onClose={() => setRateSession(null)}
-          onRated={(id) => { setRatedIds(ids => [...ids, id]); setRateSession(null); showToast('Thanks for rating your session!'); }} />
+          onRated={(id) => { setRatedIds(ids => [...ids, id]); setRateSession(null); showToast('Thanks for your review!'); }} />
       )}
       {confirmDlg?.preview && (
         <CancelRefundModal title={confirmDlg.message} preview={confirmDlg.preview} confirmLabel={confirmDlg.confirmLabel}
@@ -671,6 +680,25 @@ export default function Bookings() {
       </div>
 
       <ReviewPrompt sessions={awaitingReview} onRate={setRateSession} />
+      {toRate.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 grid place-items-center shrink-0"><Star size={17} className="text-amber-600" /></div>
+            <div className="min-w-0">
+              <p className="font-bold text-amber-900 text-sm">How was {toRate[0].cohort_title}?</p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Your rating and review help the achiever and other students.
+                {toRate.length > 1 ? ` ${toRate.length - 1} more to review.` : ''}
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={() => rateCohort(toRate[0])}
+            className="w-full sm:w-auto shrink-0 min-h-11 px-3.5 py-2 rounded-xl text-white text-xs font-bold hover:opacity-90"
+            style={{ backgroundColor: '#f59e0b' }}>
+            Rate now
+          </button>
+        </div>
+      )}
 
       {/* Tabs: the platform's icon tabs, same as every other screen. */}
       {sessError && (
@@ -812,6 +840,11 @@ export default function Bookings() {
                           : <span className="text-xs text-slate-400 flex items-center gap-1"><XCircle size={11} /> Not attended</span>}
                       </div>
                       <ClassNote item={b} kind="cohort" onReport={setReport} />
+                      {b.can_review && (ratedIds.includes(b.cohort_id) ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600"><Star size={11} fill="#059669" /> Reviewed</span>
+                      ) : (
+                        <button onClick={() => rateCohort(b)} className="inline-flex items-center gap-1 min-h-9 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white" style={{ backgroundColor: '#f59e0b' }}><Star size={11} /> Rate &amp; review</button>
+                      ))}
                       {hasActions && (
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           {b.meeting_link && b.cohort_status !== 'completed' && (
@@ -904,7 +937,12 @@ export default function Bookings() {
                                   loading={cancelling === b.id}
                                   onClick={() => handleCancel(b.id)} />
                               )}
-                              {!hasActions && <span className="text-xs text-slate-300">—</span>}
+                              {b.can_review && (ratedIds.includes(b.cohort_id) ? (
+                                <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600"><Star size={10} fill="#059669" /> Reviewed</span>
+                              ) : (
+                                <button onClick={() => rateCohort(b)} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-white whitespace-nowrap" style={{ backgroundColor: '#f59e0b' }}><Star size={10} /> Rate</button>
+                              ))}
+                              {!hasActions && !b.can_review && <span className="text-xs text-slate-300">—</span>}
                             </div>
                           </Td>
                           <Td>

@@ -41,6 +41,7 @@ def _cohort_can_join(cohort, eff_status):
 
 def _booking_dict(enr, cohort, achiever):
     from portal.helpers import class_rules as CR
+    from portal.routes.AchieverReviews.achiever_reviews import cohort_review_allowed
     confirmed  = enr.get('payment_status') in ('paid', 'free')
     eff_status = _effective_status(cohort)
     cls        = CR.state(cohort, cohort.get('session_date'), cohort.get('duration_minutes'), eff_status)
@@ -56,6 +57,8 @@ def _booking_dict(enr, cohort, achiever):
         'payment_id': enr.get('payment_id'),
         'amount_paid': float(enr.get('amount_paid') or 0),
         'attended': enr.get('attended'),
+        'can_review': cohort_review_allowed(cohort, enr),
+        'achiever_id': cohort.get('achiever_id'),
         'session_date': serialize_datetime(cohort.get('session_date')),
         'duration_minutes': cohort.get('duration_minutes'),
         'is_live': eff_status == 'live',

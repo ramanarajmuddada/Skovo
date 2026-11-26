@@ -105,9 +105,48 @@ function Reveal({ children, direction = 'up', delay = 0, className = '' }) {
 // Always light — this is a solid card sitting above a dark hero, not the
 // transparent-over-hero pattern the rest of the site's chrome used to use, so
 // there's no scroll-triggered color swap here, just a shadow once you scroll.
-// The achiever portal dropdown that used to live here is gone; sign-in/register
-// for achievers are still reachable from the achievers section below and the
-// footer, so nothing is actually unreachable.
+// "Sign in" opens two separate choices, Student and Achiever.
+const SIGN_IN = [
+  { to: '/login', label: 'Student sign in', sub: 'Cohorts, score and colleges', icon: GraduationCap },
+  { to: '/skovo-achiever-portal/login', label: 'Achiever sign in', sub: 'Teach students and earn', icon: UserCheck },
+];
+
+function SignInMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 lg:px-4 py-2 rounded-full hover:bg-slate-100 transition-all">
+        Sign in <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl p-1.5">
+          {SIGN_IN.map(({ to, label, sub, icon: Icon }) => (
+            <Link key={to} to={to} onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-slate-50">
+              <span className="w-10 h-10 shrink-0 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center"><Icon size={18} /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-slate-900">{label}</span>
+                <span className="block text-xs text-slate-500">{sub}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -171,9 +210,7 @@ function Navbar() {
 
         {/* CTAs from tablet up */}
         <div className="hidden md:flex items-center gap-1.5 ml-auto">
-          <Link to="/login" className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 lg:px-4 py-2 rounded-full hover:bg-slate-100 transition-all">
-            Sign in
-          </Link>
+          <SignInMenu />
           <Link to="/signup" className={`${cta} px-4 lg:px-5 py-2.5 text-sm`}>
             Start free <ArrowRight size={14} />
           </Link>
@@ -215,20 +252,22 @@ function Navbar() {
             <Link to="/signup" onClick={() => setOpen(false)} className={`${cta} w-full min-h-12 text-sm`}>
               Create free account <ArrowRight size={15} />
             </Link>
-            <Link to="/login" onClick={() => setOpen(false)} className="flex items-center justify-center w-full min-h-12 rounded-full border border-slate-200 text-sm font-semibold text-slate-700">
-              Sign in
-            </Link>
           </div>
 
-          <Link to="/skovo-achiever-portal/login" onClick={() => setOpen(false)}
-                className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 p-3.5">
-            <span className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><UserCheck size={18} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-slate-900">Are you an achiever?</span>
-              <span className="block text-xs text-slate-500">Sign in to the Achiever portal</span>
-            </span>
-            <ArrowRight size={15} className="shrink-0 text-slate-400" />
-          </Link>
+          <p className="mt-5 px-1 mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">Sign in</p>
+          <div className="space-y-2.5">
+            {SIGN_IN.map(({ to, label, sub, icon: Icon }) => (
+              <Link key={to} to={to} onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3.5">
+                <span className="w-10 h-10 shrink-0 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center"><Icon size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-900">{label}</span>
+                  <span className="block text-xs text-slate-500">{sub}</span>
+                </span>
+                <ArrowRight size={15} className="shrink-0 text-slate-400" />
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </nav>

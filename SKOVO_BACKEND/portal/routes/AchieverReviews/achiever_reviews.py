@@ -19,6 +19,25 @@ from . import ns, logger
 _CONTEXT_TYPES = ('general', 'session', 'cohort')
 
 
+def cohort_review_allowed(cohort, enrolment):
+    """May this enrolled student rate this class?
+
+    Yes once the class has completed, and also while it runs for a student who
+    has checked in. Never for a cancelled or missed class, or one the achiever
+    never started. The one rule behind the submit check and every Rate button.
+    """
+    if not cohort or not enrolment or enrolment.get('payment_status') not in ('paid', 'free'):
+        return False
+    if cohort.get('status') == 'cancelled' or cohort.get('missed_at'):
+        return False
+    eff = effective_cohort_status(types.SimpleNamespace(
+        status=cohort.get('status'), session_date=cohort.get('session_date'),
+        duration_minutes=cohort.get('duration_minutes')))
+    if enrolment.get('attended'):
+        return eff in ('live', 'completed')
+    return eff == 'completed' and bool(cohort.get('started_at'))
+
+
 def _cohort_feedback_guard(user_id, achiever_id, cohort_id):
     """None when this student may rate this cohort, else a ready-to-return body.
 
@@ -27,7 +46,7 @@ def _cohort_feedback_guard(user_id, achiever_id, cohort_id):
 
       1. the cohort exists and belongs to the achiever being reviewed,
       2. the student holds a confirmed enrolment in *that* cohort,
-      3. the class has actually started.
+      3. the class has completed (or is running and they have checked in).
 
     (3) is the judgement call. Feedback on a class nobody has attended yet is
     not feedback — and these ratings are what students and admins judge an achiever
@@ -54,13 +73,8 @@ def _cohort_feedback_guard(user_id, achiever_id, cohort_id):
     if not enrolment or enrolment.get('payment_status') not in ('paid', 'free'):
         return _jsonify(response={'message': 'You can only give feedback on a class you joined.'},
                         status=403, bool=False)
-    # The check-in code is the proof of attendance: no code, no review. A
-    # cancelled or missed class never ran, so it can't be rated either.
     if cohort.get('status') == 'cancelled' or cohort.get('missed_at'):
         return _jsonify(response={'message': 'This class did not run, so it cannot be rated.'},
-                        status=403, bool=False)
-    if not enrolment.get('attended'):
-        return _jsonify(response={'message': 'Only students who checked in can rate this class.'},
                         status=403, bool=False)
 
     eff = effective_cohort_status(types.SimpleNamespace(
@@ -68,11 +82,12 @@ def _cohort_feedback_guard(user_id, achiever_id, cohort_id):
         session_date=cohort.get('session_date'),
         duration_minutes=cohort.get('duration_minutes'),
     ))
-    if eff == 'cancelled':
-        return _jsonify(response={'message': 'This class was cancelled.'}, status=400, bool=False)
     if eff == 'upcoming':
         return _jsonify(response={'message': 'You can leave feedback once the class has started.'},
                         status=400, bool=False)
+    if not cohort_review_allowed(cohort, enrolment):
+        return _jsonify(response={'message': 'You can rate this class once it is completed.'},
+                        status=403, bool=False)
     return None
 
 
@@ -258,6 +273,19 @@ class AchieverReviewList(Resource):
             db.session.commit()
 
             user = call_proc_one('sp_users_get', user_id)
+            if not existing:
+                # In-app only. A failed notice must not fail a saved review.
+                try:
+                    from portal.helpers.achiever_notify import tell_achiever, achiever_url, PORTAL_PATH
+                    tell_achiever(
+                        achiever_id, 'You have a new review',
+                        f"{(user or {}).get('full_name') or 'A student'} rated you {rating} out of 5.",
+                        email=False, button_url=achiever_url(PORTAL_PATH + '/reviews'),
+                        reference_type='review', reference_id=(r or {}).get('id'))
+                    db.session.commit()
+                except Exception as note_err:                  # noqa: BLE001
+                    db.session.rollback()
+                    logger.warning(f"review notice failed for {achiever_id}: {note_err}")
             return jsonify(response={'message': message, 'review': _dict(r, user)}, status=200, bool=True)
         except Exception as e:
             db.session.rollback()

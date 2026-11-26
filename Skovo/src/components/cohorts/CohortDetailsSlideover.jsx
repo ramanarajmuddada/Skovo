@@ -281,9 +281,6 @@ export default function CohortDetailsSlideover({ cohort, isOpen, onClose, onEnro
   const availableSeats = detail?.available_seats ?? cohort.availableSeats;
   const isFull        = Boolean(totalSeats) && availableSeats === 0 && !isEnrolled;
   const mentorAvatar  = detail?.achiever?.avatar_url || detail?.achiever?.profile_image_url || cohort.mentorAvatar;
-  // Live or completed — the class has actually run. 'cancelled' is excluded on
-  // purpose: there is nothing to rate.
-  const classStarted  = ['live', 'completed'].includes(cohortStatus);
   const achieverId    = detail?.achiever?.id || cohort.achiever?.id || null;
 
 
@@ -402,8 +399,8 @@ export default function CohortDetailsSlideover({ cohort, isOpen, onClose, onEnro
             completed class no longer shows an enrolled student a blank panel.
             The gate matches the server's exactly; showing the box on an
             upcoming class would only earn a refusal. */}
-        {/* Only after checking in (the code is the proof), never on a cancelled class. */}
-        {classStarted && achieverId && detail?.attended && (
+        {/* The server decides: completed classes, or a running one after check-in. */}
+        {achieverId && detail?.can_review && (
           <CohortFeedbackBox
             cohortId={cohort.id}
             achieverId={achieverId}

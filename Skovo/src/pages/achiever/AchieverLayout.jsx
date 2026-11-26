@@ -1,4 +1,5 @@
 import useMobileCardTables from '../../hooks/useMobileCardTables';
+import { goHomeAfterSignOut } from '../../utils/signOut';
 import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import PageTransition from '../../components/ui/PageTransition';
@@ -35,6 +36,8 @@ const NAV_GROUPS = [
       // screens are used in the same sitting — run the session, set the work.
       { to: '/skovo-achiever-portal/tasks',         label: 'Tasks',         icon: ClipboardList, key: 'tasks' },
       { to: '/skovo-achiever-portal/review-queue',  label: 'Review queue',  icon: ClipboardList, key: 'tasks' },
+      // Same access as Cohorts: feedback is about classes they have run.
+      { to: '/skovo-achiever-portal/reviews',       label: 'Reviews',       icon: Star, key: 'cohorts' },
       { to: '/skovo-achiever-portal/availability',  label: 'Availability',  icon: Clock, key: 'availability' },
       { to: '/skovo-achiever-portal/earnings',      label: 'Earnings',      icon: TrendingUp, key: 'earnings' },
       // v1: no Domains screen. Achievers pick (or add) a domain inside Create cohort;
@@ -85,6 +88,7 @@ const PAGE_TITLES = {
   '/skovo-achiever-portal/cohorts':        'My Cohorts',
   '/skovo-achiever-portal/tasks':          'Tasks',
   '/skovo-achiever-portal/review-queue':   'Review queue',
+  '/skovo-achiever-portal/reviews':        'Reviews',
   '/skovo-achiever-portal/availability':   'Availability',
   '/skovo-achiever-portal/earnings':       'Earnings',
   '/skovo-achiever-portal/domains':        'Domains',
@@ -226,11 +230,8 @@ function UserMenu({ canProfile }) {
 
   function handleSignOut() {
     clearAchieverToken();
-    // Home, not the login form — the same rule the student sidebar already
-    // follows. An achiever signing out is leaving, not switching accounts, and
-    // dropping them on "Welcome back" asks them to do the one thing they just
-    // chose not to do. The landing page gives them a reason to come back.
-    navigate('/');
+    // Home, not the login form -- the same rule as the student portal.
+    goHomeAfterSignOut();
   }
 
   const initial      = user?.full_name?.charAt(0)?.toUpperCase() || 'A';

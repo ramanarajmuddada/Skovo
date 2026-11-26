@@ -1,4 +1,5 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { cameFromSignOut, forgetSignOut } from './utils/signOut';
 import PublicShell from './components/layout/PublicShell';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/ui/index.jsx';
@@ -175,6 +176,7 @@ const AchieverBookings     = /* @__PURE__ */ lazy(() => import('./pages/achiever
 const AchieverCohorts      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverCohorts'));
 const AchieverTasks       = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverTasks'));
 const AchieverReviewQueue  = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverReviewQueue'));
+const AchieverReviews      = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverReviews'));
 const AchieverAvailability = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverAvailability'));
 const AchieverEarnings     = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverEarnings'));
 const AchieverReferrals    = /* @__PURE__ */ lazy(() => import('./pages/achiever/AchieverReferrals'));
@@ -228,6 +230,9 @@ function ToAdminSite() {
 /* ── Route guards ─────────────────────────────────────────────────────── */
 function HomeRoute() {
   const { user } = useAuth();
+  // Read once on arrival; cleared so the next visit behaves normally again.
+  const [signedOut] = useState(cameFromSignOut);
+  useEffect(() => { forgetSignOut(); }, []);
 
   // One bundle serves two hostnames. On the admin domain (skovoai.info) the
   // root is the admin console's landing page — never the student one, and never
@@ -235,7 +240,7 @@ function HomeRoute() {
   // says nothing about who is standing at the admin door.
   if (PORTAL === 'admin' || (PORTAL !== 'web' && isAdminHost())) return <ConsoleLanding />;
 
-  return user ? <Navigate to="/career-path" replace /> : <LandingPage />;
+  return user && !signedOut ? <Navigate to="/career-path" replace /> : <LandingPage />;
 }
 
 function ProtectedRoute({ children }) {
@@ -416,6 +421,7 @@ function App() {
             <Route path="cohorts"      element={<AchieverCohorts />} />
             <Route path="tasks"        element={<AchieverTasks />} />
             <Route path="review-queue" element={<AchieverReviewQueue />} />
+            <Route path="reviews"      element={<AchieverReviews />} />
             <Route path="availability" element={<AchieverAvailability />} />
             <Route path="earnings"     element={<AchieverEarnings />} />
             {/* v1: Domains screen hidden; domains are picked in Create cohort.
